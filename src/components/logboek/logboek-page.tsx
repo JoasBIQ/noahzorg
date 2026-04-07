@@ -18,6 +18,7 @@ interface LogboekPageProps {
   allProfiles: Profile[]
   currentProfile: Profile
   currentUserId: string
+  initialShowForm?: boolean
 }
 
 const containerVariants = {
@@ -38,9 +39,10 @@ export function LogboekPage({
   allProfiles,
   currentProfile,
   currentUserId,
+  initialShowForm = false,
 }: LogboekPageProps) {
   const [entries, setEntries] = useState<LogEntry[]>(initialEntries)
-  const [showForm, setShowForm] = useState(false)
+  const [showForm, setShowForm] = useState(initialShowForm)
   const [filterCategorie, setFilterCategorie] = useState<string>('alle')
   const [filterAuteur, setFilterAuteur] = useState<string>('alle')
   const [showArchived, setShowArchived] = useState(false)

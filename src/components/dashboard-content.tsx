@@ -1,18 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import {
   Calendar,
-  CheckSquare,
   BookOpen,
   ChevronRight,
   Clock,
   MapPin,
-  ExternalLink,
+  PenLine,
+  CheckSquare,
+  Mail,
+  Users,
+  MessageSquare,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
@@ -22,7 +23,6 @@ import {
   formatDate,
   formatTime,
   formatRelative,
-  cn,
 } from '@/lib/utils'
 import {
   AGENDA_TYPE_LABELS,
@@ -30,13 +30,14 @@ import {
   CATEGORIE_LABELS,
   CATEGORIE_COLORS,
 } from '@/lib/constants'
-import type { Profile, LogEntry, AgendaItem } from '@/types'
+import type { Profile, LogEntry, AgendaItem, Overleg } from '@/types'
 
 interface DashboardContentProps {
   profile: Profile
   allProfiles: Profile[]
   logboekEntries: LogEntry[]
   agendaItems: AgendaItem[]
+  overleggen: Overleg[]
 }
 
 const containerVariants = {
@@ -52,13 +53,26 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 }
 
+type ActivityItem =
+  | { type: 'logboek'; entry: LogEntry; ts: string }
+  | { type: 'overleg'; overleg: Overleg; ts: string }
+
 export function DashboardContent({
   profile,
   allProfiles,
   logboekEntries,
   agendaItems,
+  overleggen,
 }: DashboardContentProps) {
   const profileMap = new Map(allProfiles.map((p) => [p.id, p]))
+
+  // Merge logboek + overleggen sorted by created_at desc, show max 5
+  const activityItems: ActivityItem[] = [
+    ...logboekEntries.map((e) => ({ type: 'logboek' as const, entry: e, ts: e.created_at })),
+    ...overleggen.map((o) => ({ type: 'overleg' as const, overleg: o, ts: o.created_at })),
+  ]
+    .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
+    .slice(0, 5)
 
   return (
     <motion.div
@@ -77,11 +91,42 @@ export function DashboardContent({
         </p>
       </motion.div>
 
-      {/* Eerstvolgende afspraken */}
+      {/* Snelle acties */}
+      <motion.div variants={itemVariants}>
+        <h2 className="font-semibold text-gray-900 mb-3">Snelle acties</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <QuickAction
+            href="/logboek?nieuw=1"
+            icon={PenLine}
+            label="Notitie schrijven"
+            color="bg-emerald-50 text-emerald-700 border-emerald-100"
+          />
+          <QuickAction
+            href="/taken?maakTaak=1"
+            icon={CheckSquare}
+            label="Maak taak"
+            color="bg-blue-50 text-blue-700 border-blue-100"
+          />
+          <QuickAction
+            href="/mail?schrijf=1"
+            icon={Mail}
+            label="Schrijf mail"
+            color="bg-violet-50 text-violet-700 border-violet-100"
+          />
+          <QuickAction
+            href="/overleggen"
+            icon={Users}
+            label="Bekijk overleggen"
+            color="bg-amber-50 text-amber-700 border-amber-100"
+          />
+        </div>
+      </motion.div>
+
+      {/* Aankomende afspraken */}
       <motion.div variants={itemVariants}>
         <SectionHeader
           icon={Calendar}
-          title="Eerstvolgende afspraken"
+          title="Aankomende afspraken"
           href="/agenda"
         />
         {agendaItems.length === 0 ? (
@@ -89,7 +134,7 @@ export function DashboardContent({
             <EmptyState
               icon={Calendar}
               title="Geen afspraken"
-              description="Er zijn geen aankomende afspraken gepland."
+              description="Er zijn geen afspraken de komende 7 dagen."
             />
           </Card>
         ) : (
@@ -127,65 +172,82 @@ export function DashboardContent({
         )}
       </motion.div>
 
-      {/* Taken (Trello) */}
-      <motion.div variants={itemVariants}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <CheckSquare size={18} className="text-primary" />
-            <h2 className="font-semibold text-gray-900">Taken</h2>
-          </div>
-        </div>
-        <TrelloDashboardCard />
-      </motion.div>
-
-      {/* Laatste berichten */}
+      {/* Laatste activiteit */}
       <motion.div variants={itemVariants}>
         <SectionHeader
           icon={BookOpen}
-          title="Notities over Noah"
+          title="Laatste activiteit"
           href="/logboek"
         />
-        {logboekEntries.length === 0 ? (
+        {activityItems.length === 0 ? (
           <Card>
             <EmptyState
               icon={BookOpen}
-              title="Nog geen berichten"
-              description="Er zijn nog geen notities over Noah geschreven."
+              title="Nog geen activiteit"
+              description="Er zijn nog geen notities of overleggen."
             />
           </Card>
         ) : (
           <div className="space-y-3">
-            {logboekEntries.map((entry) => {
-              const auteur = profileMap.get(entry.auteur_id)
-              return (
-                <Card
-                  key={entry.id}
-                  borderColor={auteur?.kleur}
-                >
-                  <div className="flex items-start gap-3">
-                    <Avatar
-                      naam={auteur?.naam ?? 'Onbekend'}
-                      kleur={auteur?.kleur ?? '#6B7280'}
-                      size="sm"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-gray-900 text-sm">
-                          {auteur?.naam ?? 'Onbekend'}
-                        </span>
-                        <span className="text-xs text-muted">
-                          {formatRelative(entry.created_at)}
-                        </span>
-                        <Badge className={CATEGORIE_COLORS[entry.categorie]}>
-                          {CATEGORIE_LABELS[entry.categorie]}
-                        </Badge>
+            {activityItems.map((item) => {
+              if (item.type === 'logboek') {
+                const auteur = profileMap.get(item.entry.auteur_id)
+                return (
+                  <Link key={`log-${item.entry.id}`} href="/logboek">
+                    <Card borderColor={auteur?.kleur} className="hover:shadow-md transition-shadow cursor-pointer">
+                      <div className="flex items-start gap-3">
+                        <Avatar
+                          naam={auteur?.naam ?? 'Onbekend'}
+                          kleur={auteur?.kleur ?? '#6B7280'}
+                          size="sm"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-gray-900 text-sm">
+                              {auteur?.naam ?? 'Onbekend'}
+                            </span>
+                            <span className="text-xs text-muted">
+                              {formatRelative(item.entry.created_at)}
+                            </span>
+                            <Badge className={CATEGORIE_COLORS[item.entry.categorie]}>
+                              {CATEGORIE_LABELS[item.entry.categorie]}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                            {item.entry.bericht}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                        {entry.bericht}
-                      </p>
+                    </Card>
+                  </Link>
+                )
+              }
+
+              // overleg
+              const aangemaakt = profileMap.get(item.overleg.aangemaakt_door)
+              return (
+                <Link key={`overleg-${item.overleg.id}`} href="/overleggen">
+                  <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                        <MessageSquare size={15} className="text-amber-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-gray-900 text-sm">
+                            {item.overleg.titel}
+                          </span>
+                          <span className="text-xs text-muted">
+                            {formatRelative(item.overleg.created_at)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted mt-0.5">
+                          Overleg aangemaakt{aangemaakt ? ` door ${aangemaakt.naam}` : ''}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </Card>
+                  </Card>
+                </Link>
               )
             })}
           </div>
@@ -221,23 +283,25 @@ function SectionHeader({
   )
 }
 
-function TrelloDashboardCard() {
+function QuickAction({
+  href,
+  icon: Icon,
+  label,
+  color,
+}: {
+  href: string
+  icon: React.ComponentType<any>
+  label: string
+  color: string
+}) {
   return (
-    <Card>
-      <Link
-        href="/taken"
-        className="flex items-center justify-between"
+    <Link href={href}>
+      <div
+        className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border text-center transition-all hover:scale-[1.02] hover:shadow-sm active:scale-[0.98] ${color}`}
       >
-        <div>
-          <p className="text-sm text-gray-700">
-            Taken bekijken
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 text-sm font-medium text-primary">
-          <CheckSquare size={16} />
-          Open taken
-        </div>
-      </Link>
-    </Card>
+        <Icon size={22} />
+        <span className="text-sm font-medium leading-tight">{label}</span>
+      </div>
+    </Link>
   )
 }

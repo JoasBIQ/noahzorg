@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation'
+import { addDays } from 'date-fns'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { AppShell } from '@/components/layout/app-shell'
 import { DashboardContent } from '@/components/dashboard-content'
-import type { LogEntry, AgendaItem, Profile } from '@/types'
+import type { LogEntry, AgendaItem, Profile, Overleg } from '@/types'
 
 export default async function HomePage() {
   const supabase = await createServerSupabaseClient()
@@ -27,20 +28,31 @@ export default async function HomePage() {
     .from('profiles')
     .select('*')
 
-  // Fetch latest 3 logboek entries (not archived)
+  // Fetch latest 5 logboek entries (not archived)
   const { data: logboekEntries } = await supabase
     .from('logboek')
     .select('*')
     .eq('gearchiveerd', false)
     .order('created_at', { ascending: false })
-    .limit(3)
+    .limit(5)
 
-  // Fetch next 3 agenda items (from now onwards)
+  // Fetch next agenda items (within 7 days, max 5)
+  const now = new Date()
+  const sevenDaysFromNow = addDays(now, 7)
   const { data: agendaItems } = await supabase
     .from('agenda')
     .select('*')
-    .gte('datum_tijd', new Date().toISOString())
+    .gte('datum_tijd', now.toISOString())
+    .lte('datum_tijd', sevenDaysFromNow.toISOString())
     .order('datum_tijd', { ascending: true })
+    .limit(5)
+
+  // Fetch last 3 overleggen (for activity feed)
+  const { data: overleggen } = await supabase
+    .from('overleggen')
+    .select('*')
+    .eq('gearchiveerd', false)
+    .order('created_at', { ascending: false })
     .limit(3)
 
   return (
@@ -50,6 +62,7 @@ export default async function HomePage() {
         allProfiles={(allProfiles ?? []) as Profile[]}
         logboekEntries={(logboekEntries ?? []) as LogEntry[]}
         agendaItems={(agendaItems ?? []) as AgendaItem[]}
+        overleggen={(overleggen ?? []) as Overleg[]}
       />
     </AppShell>
   )

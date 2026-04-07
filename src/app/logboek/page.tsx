@@ -4,7 +4,11 @@ import { AppShell } from '@/components/layout/app-shell'
 import { LogboekPage } from '@/components/logboek/logboek-page'
 import type { LogEntry, Profile } from '@/types'
 
-export default async function LogboekRoute() {
+export default async function LogboekRoute({
+  searchParams,
+}: {
+  searchParams: { nieuw?: string }
+}) {
   const supabase = await createServerSupabaseClient()
 
   const {
@@ -39,6 +43,7 @@ export default async function LogboekRoute() {
         allProfiles={(profiles ?? []) as Profile[]}
         currentProfile={currentProfile as unknown as Profile}
         currentUserId={user.id}
+        initialShowForm={searchParams.nieuw === '1'}
       />
     </AppShell>
   )

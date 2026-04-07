@@ -5,7 +5,11 @@ import { MailPage } from '@/components/mail/mail-page'
 import { isGmailConnected } from '@/lib/gmail'
 import type { Profile } from '@/types'
 
-export default async function MailRoute() {
+export default async function MailRoute({
+  searchParams,
+}: {
+  searchParams: { schrijf?: string }
+}) {
   const supabase = await createServerSupabaseClient()
 
   const {
@@ -32,6 +36,7 @@ export default async function MailRoute() {
         currentProfile={profile}
         initialConnected={connected}
         gmailEmail={connected ? gmailEmail ?? null : null}
+        initialSchrijf={searchParams.schrijf === '1'}
       />
     </AppShell>
   )

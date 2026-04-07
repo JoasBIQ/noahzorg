@@ -56,6 +56,7 @@ interface MailPageProps {
   currentProfile: Profile
   initialConnected: boolean
   gmailEmail?: string | null
+  initialSchrijf?: boolean
 }
 
 function parseFrom(from: string): { naam: string; email: string } {
@@ -386,7 +387,7 @@ const TABS: { id: MailTab; label: string; icon: React.ComponentType<any>; emptyT
   },
 ]
 
-export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailEmail }: MailPageProps) {
+export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailEmail, initialSchrijf = false }: MailPageProps) {
   const [activeTab, setActiveTab] = useState<MailTab>('INBOX')
   const [messagesByTab, setMessagesByTab] = useState<Record<MailTab, GmailMessage[]>>({
     INBOX: [],
@@ -412,7 +413,7 @@ export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailE
   }, [initialConnected])
 
   // Schrijf mail
-  const [showSchrijfModal, setShowSchrijfModal] = useState(false)
+  const [showSchrijfModal, setShowSchrijfModal] = useState(initialSchrijf)
   const [schrijfAan, setSchrijfAan] = useState('')
   const [schrijfOnderwerp, setSchrijfOnderwerp] = useState('')
   const [schrijfBericht, setSchrijfBericht] = useState('')
