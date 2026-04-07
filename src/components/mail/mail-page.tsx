@@ -243,6 +243,14 @@ function MailItem({
   const [savingOverleg, setSavingOverleg] = useState(false)
   const [overlegAangemaakt, setOverlegAangemaakt] = useState(false)
   const [trashingMail, setTrashingMail] = useState(false)
+  // Reply modal
+  const [showReplyModal, setShowReplyModal] = useState(false)
+  const [replyCc, setReplyCc] = useState('familie.noahdeinum@gmail.com')
+  const [replyBericht, setReplyBericht] = useState('')
+  const [showQuote, setShowQuote] = useState(false)
+  const [replySending, setReplySending] = useState(false)
+  const [replySent, setReplySent] = useState(false)
+  const [replyError, setReplyError] = useState<string | null>(null)
 
   useEffect(() => {
     setLocalOngelezen(heeftOngelezen)
@@ -321,6 +329,50 @@ function MailItem({
     } finally {
       setTrashingMail(false)
     }
+  }
+
+  const handleSendReply = async () => {
+    if (!replyBericht.trim()) return
+    setReplySending(true)
+    setReplyError(null)
+
+    const { email: senderEmail } = parseFrom(message.from)
+    const replyOnderwerp = message.subject.startsWith('Re:') ? message.subject : `Re: ${message.subject}`
+
+    // Geciteerde tekst toevoegen als de gebruiker de quote open heeft staan
+    const citaat = showQuote
+      ? `\n\n--- Oorspronkelijk bericht ---\nVan: ${message.from}\nDatum: ${message.date}\n\n${message.body || message.snippet}`
+      : ''
+    const volledigBericht = replyBericht + citaat
+
+    const res = await fetch('/api/gmail/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        aan: senderEmail,
+        onderwerp: replyOnderwerp,
+        bericht: volledigBericht,
+        cc: replyCc.trim() || undefined,
+        // Gmail threadId zodat de reply in de juiste thread komt
+        threadId: message.threadId,
+      }),
+    })
+
+    setReplySending(false)
+
+    if (!res.ok) {
+      const data = await res.json()
+      setReplyError(data.error === 'token_expired' ? 'Gmail sessie verlopen. Koppel Gmail opnieuw via Beheer.' : (data.error || 'Verzenden mislukt.'))
+      return
+    }
+
+    setReplySent(true)
+    setTimeout(() => {
+      setShowReplyModal(false)
+      setReplyBericht('')
+      setReplySent(false)
+      setShowQuote(false)
+    }, 1500)
   }
 
   // Verzonden: toon ontvanger (To-header), Inbox: toon afzender, Concept: geen afzender
@@ -411,13 +463,13 @@ function MailItem({
               {!isDraft && (
                 <div className="flex items-center gap-3 mt-3">
                   {!isSent && (
-                    <a
-                      href={replyHref}
+                    <button
+                      onClick={() => { setShowReplyModal(true); setReplySent(false); setReplyError(null) }}
                       className="flex items-center gap-1.5 text-xs text-[#4A7C59] hover:underline font-medium"
                     >
                       <Reply size={14} />
-                      Beantwoorden in e-mail
-                    </a>
+                      Beantwoorden
+                    </button>
                   )}
 
                   {tab === 'INBOX' && (
@@ -598,6 +650,121 @@ function MailItem({
                     className="flex-1 py-2.5 rounded-xl bg-[#4A7C59] text-white text-sm font-medium hover:bg-[#3d6a4a] transition-colors disabled:opacity-50"
                   >
                     {savingOverleg ? 'Opslaan...' : 'Opslaan'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Reply modal */}
+      {showReplyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowReplyModal(false)} />
+          <div className="relative bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+              <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <Reply size={16} className="text-[#4A7C59]" />
+                Beantwoorden
+              </h2>
+              <button onClick={() => setShowReplyModal(false)} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {replySent ? (
+              <div className="p-8 flex flex-col items-center gap-3 text-center">
+                <div className="w-12 h-12 rounded-full bg-[#4A7C59]/10 flex items-center justify-center">
+                  <Reply size={22} className="text-[#4A7C59]" />
+                </div>
+                <p className="font-semibold text-gray-900">Mail verstuurd!</p>
+                <p className="text-sm text-[#6B7280]">Je reactie is verstuurd en verschijnt in Verzonden.</p>
+              </div>
+            ) : (
+              <div className="p-4 space-y-3">
+                {/* Aan (niet aanpasbaar) */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Aan</label>
+                  <div className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-700">
+                    {parseFrom(message.from).email}
+                  </div>
+                </div>
+
+                {/* CC */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">CC</label>
+                  <input
+                    type="text"
+                    value={replyCc}
+                    onChange={(e) => setReplyCc(e.target.value)}
+                    placeholder="optioneel cc-adres"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59] transition-colors"
+                  />
+                </div>
+
+                {/* Onderwerp (niet aanpasbaar) */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Onderwerp</label>
+                  <div className="w-full rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-700">
+                    {message.subject.startsWith('Re:') ? message.subject : `Re: ${message.subject}`}
+                  </div>
+                </div>
+
+                {/* Bericht */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Bericht</label>
+                  <textarea
+                    value={replyBericht}
+                    onChange={(e) => setReplyBericht(e.target.value)}
+                    rows={6}
+                    autoFocus
+                    placeholder="Schrijf je reactie..."
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59] transition-colors resize-none"
+                  />
+                </div>
+
+                {/* Geciteerde mail (inklapbaar) */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuote((v) => !v)}
+                    className="flex items-center gap-1.5 text-xs text-[#6B7280] hover:text-gray-900 transition-colors"
+                  >
+                    <ChevronDown size={13} className={`transition-transform ${showQuote ? 'rotate-180' : ''}`} />
+                    {showQuote ? 'Verberg geciteerde mail' : 'Toon geciteerde mail'}
+                  </button>
+                  {showQuote && (
+                    <div className="mt-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl p-3 whitespace-pre-wrap max-h-40 overflow-y-auto font-mono leading-relaxed">
+                      <p className="font-sans font-medium text-gray-600 mb-1">Van: {message.from} · {message.date.slice(0, 16)}</p>
+                      {message.body || message.snippet}
+                    </div>
+                  )}
+                </div>
+
+                {replyError && (
+                  <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
+                    <span className="flex-shrink-0 mt-0.5">⚠</span>
+                    {replyError}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => setShowReplyModal(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    Annuleren
+                  </button>
+                  <button
+                    onClick={handleSendReply}
+                    disabled={replySending || !replyBericht.trim()}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#4A7C59] text-white text-sm font-medium hover:bg-[#3d6a4a] transition-colors disabled:opacity-50"
+                  >
+                    {replySending
+                      ? <><Loader2 size={14} className="animate-spin" /> Versturen...</>
+                      : <><SendHorizonal size={14} /> Versturen</>
+                    }
                   </button>
                 </div>
               </div>

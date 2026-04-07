@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Niet ingelogd.' }, { status: 401 })
     }
 
-    const { aan, onderwerp, bericht } = await request.json()
+    const { aan, onderwerp, bericht, cc, inReplyTo, references, threadId } = await request.json()
 
     if (!aan || !bericht) {
       return NextResponse.json({ error: 'Ontvanger en bericht zijn verplicht.' }, { status: 400 })
@@ -32,26 +32,23 @@ export async function POST(request: NextRequest) {
     const fromEmail = profileRes.data.emailAddress ?? 'me'
 
     // Stel RFC 2822 e-mailbericht op
-    const fromHeader = `From: ${fromEmail}`
-    const toHeader = `To: ${aan}`
-    const subjectHeader = `Subject: =?UTF-8?B?${Buffer.from(onderwerp ?? '').toString('base64')}?=`
-    const mimeHeader = 'MIME-Version: 1.0'
-    const contentType = 'Content-Type: text/plain; charset=UTF-8'
-    const contentTransfer = 'Content-Transfer-Encoding: base64'
+    const headers: string[] = [
+      `From: ${fromEmail}`,
+      `To: ${aan}`,
+      `Subject: =?UTF-8?B?${Buffer.from(onderwerp ?? '').toString('base64')}?=`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/plain; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+    ]
+
+    if (cc) headers.push(`Cc: ${cc}`)
+    if (inReplyTo) headers.push(`In-Reply-To: ${inReplyTo}`)
+    if (references) headers.push(`References: ${references}`)
+
     const body = Buffer.from(bericht, 'utf-8').toString('base64')
+    const rawEmail = [...headers, '', body].join('\r\n')
 
-    const rawEmail = [
-      fromHeader,
-      toHeader,
-      subjectHeader,
-      mimeHeader,
-      contentType,
-      contentTransfer,
-      '',
-      body,
-    ].join('\r\n')
-
-    // Gmail API vereist URL-safe base64 (geen padding +/=)
+    // Gmail API vereist URL-safe base64 (geen +/=)
     const encodedEmail = Buffer.from(rawEmail)
       .toString('base64')
       .replace(/\+/g, '-')
@@ -60,7 +57,11 @@ export async function POST(request: NextRequest) {
 
     await gmail.users.messages.send({
       userId: 'me',
-      requestBody: { raw: encodedEmail },
+      requestBody: {
+        raw: encodedEmail,
+        // threadId zorgt dat Gmail de reply aan de juiste thread koppelt
+        ...(threadId ? { threadId } : {}),
+      },
     })
 
     return NextResponse.json({ success: true })
