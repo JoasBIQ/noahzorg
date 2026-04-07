@@ -18,72 +18,98 @@ export default function InviteAcceptPage() {
   const [showWachtwoord, setShowWachtwoord] = useState(false)
   const [showBevestig, setShowBevestig] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
 
+  function applySession(user: { id: string; user_metadata?: Record<string, unknown> }) {
+    setUserId(user.id)
+    const metaNaam = user.user_metadata?.naam as string | undefined
+    if (metaNaam) setNaam(metaNaam)
+    setStep('form')
+  }
+
   useEffect(() => {
-    // Supabase verwerkt de hash-tokens automatisch via de browser client.
-    // We luisteren naar de SIGNED_IN event die wordt getriggerd zodra de
-    // uitnodigingstoken verwerkt is.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-          const user = session.user
-          setUserId(user.id)
-          // Vul naam voor in vanuit user metadata (ingesteld door de beheerder)
-          const metaNaam = user.user_metadata?.naam as string | undefined
-          if (metaNaam) setNaam(metaNaam)
-          setStep('form')
-        } else if (event === 'INITIAL_SESSION' && !session) {
-          // Geen sessie en geen token in de URL → stuur naar login
+    // Debug: log what's in the URL
+    console.log('[invite-accept] href:', window.location.href)
+    console.log('[invite-accept] search:', window.location.search)
+    console.log('[invite-accept] hash:', window.location.hash)
+
+    // ── PKCE flow: Supabase stuurt ?code=xxx naar de pagina ──────────────
+    const searchParams = new URLSearchParams(window.location.search)
+    const code = searchParams.get('code')
+    if (code) {
+      console.log('[invite-accept] PKCE code gevonden, exchangeCodeForSession aanroepen...')
+      supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+        console.log('[invite-accept] exchangeCodeForSession result:', { user: data.session?.user?.email, error })
+        if (data.session?.user) {
+          applySession(data.session.user)
+        } else {
+          console.error('[invite-accept] exchange mislukt:', error)
           setStep('error')
         }
-      }
-    )
+      })
+      return
+    }
 
-    // Controleer ook direct of er al een sessie is (PKCE code al verwerkt)
+    // ── Hash / implicit flow: #access_token=...&type=invite ──────────────
+    // Supabase browser client verwerkt de hash automatisch en triggert
+    // SIGNED_IN of PASSWORD_RECOVERY zodra de tokens verwerkt zijn.
+    // BELANGRIJK: INITIAL_SESSION met null sessie vuren VOOR de hash
+    // verwerkt is — die moet genegeerd worden.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[invite-accept] onAuthStateChange:', event, 'user:', session?.user?.email ?? 'geen')
+
+      if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'USER_UPDATED')) {
+        applySession(session.user)
+      }
+      // INITIAL_SESSION zonder sessie wordt genegeerd — de hash wordt
+      // asynchroon verwerkt, SIGNED_IN volgt daarna vanzelf.
+    })
+
+    // Fallback: misschien is de sessie al aanwezig (bijv. na page refresh)
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[invite-accept] getSession:', session?.user?.email ?? 'geen sessie')
       if (session?.user) {
-        const user = session.user
-        setUserId(user.id)
-        const metaNaam = user.user_metadata?.naam as string | undefined
-        if (metaNaam) setNaam(metaNaam)
-        setStep('form')
+        applySession(session.user)
       }
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Timeout: als er na 8 seconden nog niets is, toon foutmelding
+  // Timeout: als er na 12 seconden nog steeds geen sessie is, toon fout
   useEffect(() => {
     const timer = setTimeout(() => {
       setStep((prev) => {
-        if (prev === 'loading') return 'error'
+        if (prev === 'loading') {
+          console.warn('[invite-accept] Timeout bereikt, geen sessie ontvangen.')
+          return 'error'
+        }
         return prev
       })
-    }, 8000)
+    }, 12000)
     return () => clearTimeout(timer)
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError(null)
+    setFormError(null)
 
-    if (!naam.trim()) { setError('Vul je naam in.'); return }
-    if (wachtwoord.length < 8) { setError('Wachtwoord moet minimaal 8 tekens bevatten.'); return }
-    if (wachtwoord !== bevestig) { setError('Wachtwoorden komen niet overeen.'); return }
+    if (!naam.trim()) { setFormError('Vul je naam in.'); return }
+    if (wachtwoord.length < 8) { setFormError('Wachtwoord moet minimaal 8 tekens bevatten.'); return }
+    if (wachtwoord !== bevestig) { setFormError('Wachtwoorden komen niet overeen.'); return }
 
     setSaving(true)
 
-    // Wachtwoord instellen en naam bijwerken in auth
+    // Wachtwoord instellen + naam bijwerken in auth metadata
     const { error: updateError } = await supabase.auth.updateUser({
       password: wachtwoord,
       data: { naam: naam.trim() },
     })
 
     if (updateError) {
-      setError('Account aanmaken mislukt: ' + updateError.message)
+      setFormError('Account aanmaken mislukt: ' + updateError.message)
       setSaving(false)
       return
     }
@@ -118,6 +144,9 @@ export default function InviteAcceptPage() {
           <div className="bg-white rounded-2xl border border-gray-200 p-8 flex flex-col items-center gap-3">
             <Loader2 size={28} className="animate-spin text-[#4A7C59]" />
             <p className="text-sm text-[#6B7280]">Uitnodiging verwerken...</p>
+            <p className="text-xs text-gray-400 text-center">
+              Even geduld, je uitnodiging wordt gecontroleerd.
+            </p>
           </div>
         )}
 
@@ -215,7 +244,6 @@ export default function InviteAcceptPage() {
                     {showBevestig ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
-                {/* Wachtwoord match indicator */}
                 {bevestig && (
                   <p className={`text-xs mt-1.5 ${wachtwoord === bevestig ? 'text-green-600' : 'text-red-500'}`}>
                     {wachtwoord === bevestig ? '✓ Wachtwoorden komen overeen' : '✗ Wachtwoorden komen niet overeen'}
@@ -223,10 +251,10 @@ export default function InviteAcceptPage() {
                 )}
               </div>
 
-              {error && (
+              {formError && (
                 <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
                   <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
-                  {error}
+                  {formError}
                 </div>
               )}
 
