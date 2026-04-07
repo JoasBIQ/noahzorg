@@ -424,6 +424,8 @@ export interface Database {
           drive_opname_id: string | null
           aangemaakt_door: string
           gearchiveerd: boolean
+          aanwezigen_tekst: string | null
+          bron: string
         }
         Insert: {
           id?: string
@@ -437,6 +439,8 @@ export interface Database {
           drive_opname_id?: string | null
           aangemaakt_door: string
           gearchiveerd?: boolean
+          aanwezigen_tekst?: string | null
+          bron?: string
         }
         Update: {
           titel?: string
@@ -447,6 +451,8 @@ export interface Database {
           gearchiveerd?: boolean
           drive_verslag_id?: string | null
           drive_opname_id?: string | null
+          aanwezigen_tekst?: string | null
+          bron?: string
         }
       }
       app_instellingen: {

@@ -18,6 +18,7 @@ import {
   X,
   Loader2,
   PenSquare,
+  CalendarPlus,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { nl } from 'date-fns/locale'
@@ -194,6 +195,13 @@ function MailItem({
   const [showDiscussion, setShowDiscussion] = useState(false)
   const [gelezen, setGelezen] = useState(message.gelezen)
   const [localOngelezen, setLocalOngelezen] = useState(heeftOngelezen)
+  const [showOverlegModal, setShowOverlegModal] = useState(false)
+  const [overlegTitel, setOverlegTitel] = useState('')
+  const [overlegDatum, setOverlegDatum] = useState('')
+  const [overlegAanwezigen, setOverlegAanwezigen] = useState('')
+  const [overlegNotities, setOverlegNotities] = useState('')
+  const [savingOverleg, setSavingOverleg] = useState(false)
+  const [overlegAangemaakt, setOverlegAangemaakt] = useState(false)
 
   useEffect(() => {
     setLocalOngelezen(heeftOngelezen)
@@ -215,6 +223,39 @@ function MailItem({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messageId: message.id }),
       })
+    }
+  }
+
+  const handleOpenOverlegModal = () => {
+    setOverlegTitel(message.subject)
+    setOverlegDatum('')
+    setOverlegAanwezigen('')
+    setOverlegNotities(message.snippet || '')
+    setShowOverlegModal(true)
+  }
+
+  const handleSaveOverleg = async () => {
+    if (!overlegTitel.trim() || !overlegDatum) return
+    setSavingOverleg(true)
+    try {
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+      await supabase.from('overleggen').insert({
+        titel: overlegTitel.trim(),
+        datum_tijd: new Date(overlegDatum).toISOString(),
+        aanwezigen: [],
+        aanwezigen_tekst: overlegAanwezigen.trim() || null,
+        notities: overlegNotities.trim() || null,
+        bron: 'mail',
+        aangemaakt_door: currentProfile.id,
+      } as never)
+      setShowOverlegModal(false)
+      setOverlegAangemaakt(true)
+      setTimeout(() => setOverlegAangemaakt(false), 4000)
+    } catch {
+      // silent fail
+    } finally {
+      setSavingOverleg(false)
     }
   }
 
@@ -341,6 +382,15 @@ function MailItem({
                       {showDiscussion ? 'Overleg verbergen' : 'Overleg'}
                     </button>
                   )}
+                  {tab === 'INBOX' && (
+                    <button
+                      onClick={handleOpenOverlegModal}
+                      className="flex items-center gap-1.5 text-xs text-[#6B7280] hover:text-[#4A7C59] transition-colors"
+                    >
+                      <CalendarPlus size={14} />
+                      {overlegAangemaakt ? 'Aangemaakt!' : 'Maak overleg aan'}
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -355,6 +405,75 @@ function MailItem({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Overleg aanmaken modal */}
+      {showOverlegModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowOverlegModal(false)} />
+          <div className="relative bg-white rounded-2xl w-full max-w-md mx-4 shadow-xl">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-900">Overleg aanmaken</h2>
+              <button onClick={() => setShowOverlegModal(false)} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Titel</label>
+                <input
+                  type="text"
+                  value={overlegTitel}
+                  onChange={(e) => setOverlegTitel(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Datum en tijd</label>
+                <input
+                  type="datetime-local"
+                  value={overlegDatum}
+                  onChange={(e) => setOverlegDatum(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Aanwezigen</label>
+                <input
+                  type="text"
+                  value={overlegAanwezigen}
+                  onChange={(e) => setOverlegAanwezigen(e.target.value)}
+                  placeholder="Bijv. Mama, Papa, Begeleider..."
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Notities</label>
+                <textarea
+                  value={overlegNotities}
+                  onChange={(e) => setOverlegNotities(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59] resize-none"
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setShowOverlegModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-[#6B7280] hover:bg-gray-50 transition-colors"
+                >
+                  Annuleren
+                </button>
+                <button
+                  onClick={handleSaveOverleg}
+                  disabled={savingOverleg || !overlegTitel.trim() || !overlegDatum}
+                  className="flex-1 py-2.5 rounded-xl bg-[#4A7C59] text-white text-sm font-medium hover:bg-[#3d6a4a] transition-colors disabled:opacity-50"
+                >
+                  {savingOverleg ? 'Opslaan...' : 'Opslaan'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

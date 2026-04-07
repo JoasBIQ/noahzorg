@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { AppShell } from '@/components/layout/app-shell'
 import { OverleggenPage } from '@/components/overleggen/overleggen-page'
-import type { Profile } from '@/types'
+import type { Profile, Overleg } from '@/types'
 
 export default async function OverleggenRoute() {
   const supabase = await createServerSupabaseClient()
@@ -21,7 +21,6 @@ export default async function OverleggenRoute() {
     .eq('id', user.id)
     .single()
 
-  // Haal de Drive verslagen-map ID op
   const { data: verslagenSetting } = await supabase
     .from('app_instellingen')
     .select('value')
@@ -30,12 +29,21 @@ export default async function OverleggenRoute() {
 
   const verslagenFolderId = (verslagenSetting as { value: string } | null)?.value ?? null
 
+  // Haal aankomende overleggen op
+  const { data: overleggen } = await supabase
+    .from('overleggen')
+    .select('*')
+    .eq('gearchiveerd', false)
+    .gte('datum_tijd', new Date().toISOString())
+    .order('datum_tijd', { ascending: true })
+
   return (
     <AppShell>
       <OverleggenPage
         currentProfile={currentProfile as unknown as Profile}
         currentUserId={user.id}
         verslagenFolderId={verslagenFolderId}
+        initialOverleggen={(overleggen ?? []) as Overleg[]}
       />
     </AppShell>
   )
