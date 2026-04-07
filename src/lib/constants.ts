@@ -27,7 +27,7 @@ export const NAV_ITEMS = [
   { label: 'Notities over Noah', href: '/logboek', icon: BookOpen, adminOnly: false },
   { label: 'Agenda', href: '/agenda', icon: Calendar, adminOnly: false },
   { label: 'Taken', href: '/taken', icon: CheckSquare, adminOnly: false },
-  { label: 'Overleggen', href: '/overleggen', icon: MessageSquare, adminOnly: false },
+  { label: 'Familieoverleg', href: '/overleggen', icon: MessageSquare, adminOnly: false },
   { label: 'Mail', href: '/mail', icon: Mail, adminOnly: false },
   { label: 'Drive', href: '/drive', icon: HardDrive, adminOnly: false },
   { label: 'Rondom Noah', href: '/team', icon: Users2, adminOnly: false },

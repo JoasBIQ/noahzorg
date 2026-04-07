@@ -97,7 +97,7 @@ export function OverleggenPage({
 
   return (
     <>
-      <Header title="Overleggen" />
+      <Header title="Familieoverleg" />
 
       <div className="p-4 lg:p-8">
         {/* Search */}
@@ -110,7 +110,7 @@ export function OverleggenPage({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Zoek overleggen..."
+            placeholder="Zoek familieoverleg..."
             className="w-full rounded-xl border border-gray-200 pl-10 pr-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
           />
         </div>
@@ -122,7 +122,7 @@ export function OverleggenPage({
           </h2>
           {aankomend.length === 0 ? (
             <p className="text-sm text-muted py-4">
-              Geen aankomende overleggen.
+              Geen aankomend familieoverleg.
             </p>
           ) : (
             <motion.div
@@ -153,7 +153,7 @@ export function OverleggenPage({
           </h2>
           {afgerond.length === 0 ? (
             <p className="text-sm text-muted py-4">
-              Geen afgeronde overleggen.
+              Geen afgerond familieoverleg.
             </p>
           ) : (
             <motion.div
@@ -229,7 +229,7 @@ export function OverleggenPage({
 
           {showArchived && gearchiveerd.length === 0 && (
             <p className="text-sm text-muted py-4">
-              Geen gearchiveerde overleggen.
+              Geen gearchiveerd familieoverleg.
             </p>
           )}
         </section>
@@ -238,8 +238,8 @@ export function OverleggenPage({
         {overleggen.filter((o) => !o.gearchiveerd).length === 0 && !showArchived && (
           <EmptyState
             icon={Users}
-            title="Nog geen overleggen"
-            description="Plan het eerste overleg om te beginnen."
+            title="Nog geen familieoverleg"
+            description="Plan het eerste familieoverleg om te beginnen."
           />
         )}
 
@@ -250,14 +250,14 @@ export function OverleggenPage({
           className="fixed bottom-24 right-4 lg:bottom-8 lg:right-8 z-40 flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-full shadow-lg hover:bg-primary-dark transition-colors"
         >
           <Plus size={20} />
-          <span className="font-medium">Nieuw overleg</span>
+          <span className="font-medium">Nieuw familieoverleg</span>
         </motion.button>
 
         {/* New overleg modal */}
         <Modal
           open={showForm}
           onClose={() => setShowForm(false)}
-          title="Nieuw overleg"
+          title="Nieuw familieoverleg"
         >
           <OverlegForm
             profiles={allProfiles}

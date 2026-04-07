@@ -40,11 +40,12 @@ const FOLDER_TREE = [
       { name: 'Wonen',        key: 'drive_map_wonen',       children: [] },
       { name: 'Dagbesteding', key: 'drive_map_dagbesteding', children: [] },
       {
-        name: 'Overleggen',
-        key: null,
+        name: 'Familieoverleg',
+        key: 'drive_map_familieoverleg',
         children: [
-          { name: 'Verslagen', key: 'drive_map_verslagen', children: [] },
-          { name: 'Opnames',   key: 'drive_map_opnames',   children: [] },
+          { name: 'Verslagen',                key: 'drive_map_verslagen',                children: [] },
+          { name: 'Opnames',                  key: 'drive_map_opnames',                  children: [] },
+          { name: 'Externe overlegverslagen', key: 'drive_map_externe_overlegverslagen', children: [] },
         ],
       },
     ],

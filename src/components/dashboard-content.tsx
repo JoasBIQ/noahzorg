@@ -116,7 +116,7 @@ export function DashboardContent({
           <QuickAction
             href="/overleggen"
             icon={Users}
-            label="Bekijk overleggen"
+            label="Familieoverleg"
             color="bg-amber-50 text-amber-700 border-amber-100"
           />
         </div>

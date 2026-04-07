@@ -46,7 +46,7 @@ export type CalendarDisplayItem =
   | (AgendaItem & { isGoogleEvent?: false })
   | GoogleCalendarEvent
 
-export type DossierCategorie = 'brief' | 'rapport' | 'verslag' | 'recept' | 'indicatie' | 'juridisch' | 'financieel' | 'overig'
+export type DossierCategorie = 'brief' | 'rapport' | 'verslag' | 'recept' | 'indicatie' | 'juridisch' | 'financieel' | 'overleg_extern' | 'overig'
 
 export interface DossierItem {
   id: string

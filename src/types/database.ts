@@ -8,7 +8,7 @@ export type AgendaType = 'medisch' | 'zorg' | 'juridisch' | 'sociaal' | 'overleg
 export type MedicatieStatus = 'actief' | 'gestopt' | 'on_hold'
 export type TrajectStatus = 'lopend' | 'afgerond' | 'on_hold' | 'gestopt'
 export type BestandCategorie = 'brief' | 'rapport' | 'indicatie' | 'foto' | 'overig'
-export type DossierCategorie = 'brief' | 'rapport' | 'verslag' | 'recept' | 'indicatie' | 'juridisch' | 'financieel' | 'overig'
+export type DossierCategorie = 'brief' | 'rapport' | 'verslag' | 'recept' | 'indicatie' | 'juridisch' | 'financieel' | 'overleg_extern' | 'overig'
 
 export interface Reactie {
   auteur_id: string

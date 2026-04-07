@@ -26,14 +26,15 @@ import { DriveFilePicker } from '@/components/overleggen/drive-file-picker'
 
 // Categorie → app_instellingen sleutel voor de juiste Drive-map
 const CATEGORIE_FOLDER_KEY: Record<DossierCategorie, string> = {
-  brief:      'drive_map_brieven',
-  rapport:    'drive_map_brieven',
-  verslag:    'drive_map_brieven',
-  recept:     'drive_map_recepten',
-  indicatie:  'drive_map_indicaties',
-  juridisch:  'drive_map_juridisch',
-  financieel: 'drive_map_financieel',
-  overig:     'drive_root_folder_id',
+  brief:          'drive_map_brieven',
+  rapport:        'drive_map_brieven',
+  verslag:        'drive_map_brieven',
+  recept:         'drive_map_recepten',
+  indicatie:      'drive_map_indicaties',
+  juridisch:      'drive_map_juridisch',
+  financieel:     'drive_map_financieel',
+  overleg_extern: 'drive_map_externe_overlegverslagen',
+  overig:         'drive_root_folder_id',
 }
 
 interface DossierTabProps {
@@ -48,6 +49,7 @@ const categorieOptions = [
   { value: 'indicatie', label: 'Indicatie' },
   { value: 'juridisch', label: 'Juridisch' },
   { value: 'financieel', label: 'Financieel' },
+  { value: 'overleg_extern', label: 'Extern overlegverslag' },
   { value: 'overig', label: 'Overig' },
 ]
 
@@ -64,6 +66,7 @@ const categorieBadgeStyles: Record<DossierCategorie, string> = {
   indicatie: 'bg-teal-50 text-teal-700',
   juridisch: 'bg-red-50 text-red-700',
   financieel: 'bg-yellow-50 text-yellow-700',
+  overleg_extern: 'bg-amber-50 text-amber-700',
   overig: 'bg-gray-100 text-[#6B7280]',
 }
 
@@ -75,6 +78,7 @@ const categorieLabels: Record<DossierCategorie, string> = {
   indicatie: 'Indicatie',
   juridisch: 'Juridisch',
   financieel: 'Financieel',
+  overleg_extern: 'Extern overlegverslag',
   overig: 'Overig',
 }
 
@@ -314,12 +318,19 @@ export function DossierTab({ currentUserId }: DossierTabProps) {
             onChange={(e) => updateField('titel', e.target.value)}
             placeholder="Titel van het document"
           />
-          <Select
-            label="Categorie"
-            options={categorieOptions}
-            value={formData.categorie}
-            onChange={(e) => updateField('categorie', e.target.value as DossierCategorie)}
-          />
+          <div className="space-y-1.5">
+            <Select
+              label="Categorie"
+              options={categorieOptions}
+              value={formData.categorie}
+              onChange={(e) => updateField('categorie', e.target.value as DossierCategorie)}
+            />
+            {formData.categorie === 'overleg_extern' && (
+              <p className="text-xs text-[#6B7280] bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                Voor verslagen van overleggen met artsen, zorgkantoor, gemeente of andere externe partijen.
+              </p>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Datum document"
