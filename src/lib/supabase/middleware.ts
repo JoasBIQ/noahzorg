@@ -39,6 +39,7 @@ export async function updateSession(request: NextRequest) {
   if (!user) {
     const isPublic =
       pathname.startsWith('/login') ||
+      pathname.startsWith('/invite-accept') ||
       pathname.startsWith('/api') ||
       pathname.startsWith('/_next') ||
       pathname.startsWith('/icons') ||
@@ -62,6 +63,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/icons') ||
+    pathname.startsWith('/invite-accept') ||
     pathname === '/manifest.json' ||
     pathname === '/sw.js'
 

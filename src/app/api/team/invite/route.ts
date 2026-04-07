@@ -43,8 +43,10 @@ export async function POST(request: Request) {
     const adminClient = createAdminClient()
 
     // Invite user via Supabase Auth
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://noahzorg.vercel.app'
     const { data: inviteData, error: inviteError } =
       await adminClient.auth.admin.inviteUserByEmail(email, {
+        redirectTo: `${siteUrl}/invite-accept`,
         data: {
           naam,
           rol: (rol as UserRole) || 'gebruiker',
