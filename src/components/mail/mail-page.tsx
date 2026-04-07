@@ -17,6 +17,7 @@ import {
   Search,
   X,
   Loader2,
+  PenSquare,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { nl } from 'date-fns/locale'
@@ -410,6 +411,12 @@ export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailE
       .catch(() => {})
   }, [initialConnected])
 
+  // Schrijf mail
+  const [showSchrijfModal, setShowSchrijfModal] = useState(false)
+  const [schrijfAan, setSchrijfAan] = useState('')
+  const [schrijfOnderwerp, setSchrijfOnderwerp] = useState('')
+  const [schrijfBericht, setSchrijfBericht] = useState('')
+
   // Zoeken
   const [searchInput, setSearchInput] = useState('')
   const [activeQuery, setActiveQuery] = useState('')
@@ -553,15 +560,93 @@ export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailE
             <p className="text-sm text-[#6B7280] mt-0.5">{gmailEmail}</p>
           )}
         </div>
-        <button
-          onClick={() => fetchTab(activeTab, true)}
-          disabled={refreshing || isLoading}
-          className="flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-gray-900 transition-colors px-3 py-2 rounded-lg hover:bg-gray-100 disabled:opacity-50"
-        >
-          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-          <span className="hidden sm:inline">Vernieuwen</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSchrijfModal(true)}
+            className="flex items-center gap-1.5 text-sm text-white bg-[#4A7C59] hover:bg-[#3d6a4a] transition-colors px-3 py-2 rounded-lg font-medium"
+          >
+            <PenSquare size={15} />
+            <span className="hidden sm:inline">Schrijf mail</span>
+          </button>
+          <button
+            onClick={() => fetchTab(activeTab, true)}
+            disabled={refreshing || isLoading}
+            className="flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-gray-900 transition-colors px-3 py-2 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Vernieuwen</span>
+          </button>
+        </div>
       </div>
+
+      {/* Schrijf mail modal */}
+      {showSchrijfModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowSchrijfModal(false)} />
+          <div className="relative bg-white rounded-2xl w-full max-w-lg mx-4 shadow-xl">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-900">Nieuwe mail</h2>
+              <button onClick={() => setShowSchrijfModal(false)} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {gmailEmail && (
+                <div className="flex items-center gap-2 bg-[#4A7C59]/8 border border-[#4A7C59]/20 rounded-lg px-3 py-2 text-sm text-[#4A7C59]">
+                  <Mail size={14} className="flex-shrink-0" />
+                  <span>Verzenden vanuit: <strong>{gmailEmail}</strong></span>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Aan</label>
+                <input
+                  type="email"
+                  value={schrijfAan}
+                  onChange={(e) => setSchrijfAan(e.target.value)}
+                  placeholder="ontvanger@email.nl"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59] transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Onderwerp</label>
+                <input
+                  type="text"
+                  value={schrijfOnderwerp}
+                  onChange={(e) => setSchrijfOnderwerp(e.target.value)}
+                  placeholder="Onderwerp"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59] transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bericht</label>
+                <textarea
+                  value={schrijfBericht}
+                  onChange={(e) => setSchrijfBericht(e.target.value)}
+                  placeholder="Schrijf je bericht hier..."
+                  rows={6}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59] transition-colors resize-none"
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setShowSchrijfModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-[#6B7280] hover:bg-gray-50 transition-colors"
+                >
+                  Annuleren
+                </button>
+                <a
+                  href={`mailto:${schrijfAan}?subject=${encodeURIComponent(schrijfOnderwerp)}&body=${encodeURIComponent(schrijfBericht)}`}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#4A7C59] text-white text-sm font-medium hover:bg-[#3d6a4a] transition-colors"
+                  onClick={() => setShowSchrijfModal(false)}
+                >
+                  <Send size={14} />
+                  Verzenden
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Zoekbalk */}
       <div className="relative mb-4">

@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { isSameDay, format, isAfter, startOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays } from 'date-fns'
 import { nl } from 'date-fns/locale'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Calendar as CalendarIcon, List, Filter } from 'lucide-react'
+import { Calendar as CalendarIcon, List, Filter } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useCalendarNavigation } from '@/hooks/use-calendar-navigation'
@@ -49,7 +49,7 @@ export function AgendaPage({
   currentUserId,
 }: AgendaPageProps) {
   const [items, setItems] = useState<AgendaItem[]>(initialItems)
-  const [showForm, setShowForm] = useState(false)
+  const [showForm] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('month')
   const [filterType, setFilterType] = useState<string>('alle')
   const [showFilters, setShowFilters] = useState(false)
@@ -138,13 +138,11 @@ export function AgendaPage({
   }, [filteredItems, viewMode])
 
   const handleFormSubmit = () => {
-    setShowForm(false)
     setDefaultDateTime(undefined)
     fetchItems()
   }
 
   const handleFormClose = () => {
-    setShowForm(false)
     setDefaultDateTime(undefined)
   }
 
@@ -164,9 +162,8 @@ export function AgendaPage({
     setViewMode(view)
   }
 
-  const handleSelectTime = (date: Date) => {
-    setDefaultDateTime(format(date, "yyyy-MM-dd'T'HH:mm"))
-    setShowForm(true)
+  const handleSelectTime = (_date: Date) => {
+    // Agenda is alleen-lezen totdat Google Calendar OAuth actief is
   }
 
   const handleSelectEvent = (item: AgendaItem) => {
@@ -329,31 +326,6 @@ export function AgendaPage({
           )}
         </>
       )}
-
-      {/* FAB - Nieuw event */}
-      <motion.button
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setShowForm(true)}
-        className="fixed bottom-24 right-4 lg:bottom-8 lg:right-8 z-40 flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-full shadow-lg hover:bg-primary-dark transition-colors"
-      >
-        <Plus size={20} />
-        <span className="font-medium">Nieuw event</span>
-      </motion.button>
-
-      {/* New event modal */}
-      <Modal
-        open={showForm}
-        onClose={handleFormClose}
-        title="Nieuwe afspraak"
-      >
-        <EventForm
-          profiles={allProfiles}
-          currentUserId={currentUserId}
-          defaultDateTime={defaultDateTime}
-          onClose={handleFormClose}
-          onSubmit={handleFormSubmit}
-        />
-      </Modal>
 
       {/* Event detail/edit modal (for calendar clicks) */}
       {selectedItem && (
