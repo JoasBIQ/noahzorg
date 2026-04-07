@@ -849,10 +849,10 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: Tr
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowInfo(true)}
-            className="flex items-center justify-center w-8 h-8 rounded-full text-[#6B7280] hover:text-[#4A7C59] hover:bg-[#4A7C59]/10 transition-colors"
-            title="Hoe werken taken?"
+            className="flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-[#4A7C59] transition-colors"
           >
-            <HelpCircle size={18} />
+            <HelpCircle size={15} />
+            Hoe werkt &quot;Taken&quot;?
           </button>
           <button
             onClick={() => window.open(boardUrl, '_blank')}
