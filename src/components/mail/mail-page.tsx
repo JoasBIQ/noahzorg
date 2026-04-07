@@ -178,6 +178,41 @@ function MailDiscussion({
   )
 }
 
+const MAANDEN: Record<string, number> = {
+  januari: 1, februari: 2, maart: 3, april: 4, mei: 5, juni: 6,
+  juli: 7, augustus: 8, september: 9, oktober: 10, november: 11, december: 12,
+}
+
+function extractDateFromText(text: string): string | null {
+  const pad = (n: number) => n.toString().padStart(2, '0')
+
+  // Datum: "14 april" of "14 april 2026"
+  const datumRe = /(\d{1,2})\s+(januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)(?:\s+(\d{4}))?/i
+  const datumMatch = text.match(datumRe)
+  if (!datumMatch) return null
+
+  const dag = parseInt(datumMatch[1])
+  const maand = MAANDEN[datumMatch[2].toLowerCase()]
+  const jaar = datumMatch[3] ? parseInt(datumMatch[3]) : new Date().getFullYear()
+
+  // Tijd: "14:00", "14.00", "om 14:00", "14:30 uur"
+  const tijdRe = /(?:om\s+)?(\d{1,2})[.:](\d{2})(?:\s*uur)?/gi
+  let uur = 10
+  let minuut = 0
+  let tijdMatch: RegExpExecArray | null
+  while ((tijdMatch = tijdRe.exec(text)) !== null) {
+    const h = parseInt(tijdMatch[1])
+    const m = parseInt(tijdMatch[2])
+    if (h >= 6 && h <= 22 && m >= 0 && m <= 59) {
+      uur = h
+      minuut = m
+      break
+    }
+  }
+
+  return `${jaar}-${pad(maand)}-${pad(dag)}T${pad(uur)}:${pad(minuut)}`
+}
+
 function MailItem({
   message,
   tab,
@@ -200,8 +235,12 @@ function MailItem({
   const [overlegDatum, setOverlegDatum] = useState('')
   const [overlegAanwezigen, setOverlegAanwezigen] = useState('')
   const [overlegNotities, setOverlegNotities] = useState('')
+  const [overlegType, setOverlegType] = useState<'fysiek' | 'online' | 'telefoon'>('fysiek')
+  const [overlegLocatie, setOverlegLocatie] = useState('')
+  const [datumHerkend, setDatumHerkend] = useState(false)
   const [savingOverleg, setSavingOverleg] = useState(false)
   const [overlegAangemaakt, setOverlegAangemaakt] = useState(false)
+  const [trashingMail, setTrashingMail] = useState(false)
 
   useEffect(() => {
     setLocalOngelezen(heeftOngelezen)
@@ -228,9 +267,17 @@ function MailItem({
 
   const handleOpenOverlegModal = () => {
     setOverlegTitel(message.subject)
-    setOverlegDatum('')
     setOverlegAanwezigen('')
     setOverlegNotities(message.snippet || '')
+    setOverlegType('fysiek')
+    setOverlegLocatie('')
+    setOverlegAangemaakt(false)
+
+    // Probeer datum/tijd te herkennen uit de mailinhoud
+    const tekst = (message.body || message.snippet || '') + ' ' + message.subject
+    const extracted = extractDateFromText(tekst)
+    setOverlegDatum(extracted ?? '')
+    setDatumHerkend(!!extracted)
     setShowOverlegModal(true)
   }
 
@@ -248,14 +295,28 @@ function MailItem({
         notities: overlegNotities.trim() || null,
         bron: 'mail',
         aangemaakt_door: currentProfile.id,
+        type_overleg: overlegType,
+        locatie: overlegLocatie.trim() || null,
       } as never)
-      setShowOverlegModal(false)
       setOverlegAangemaakt(true)
-      setTimeout(() => setOverlegAangemaakt(false), 4000)
     } catch {
       // silent fail
     } finally {
       setSavingOverleg(false)
+    }
+  }
+
+  const handleTrashMail = async () => {
+    setTrashingMail(true)
+    try {
+      await fetch('/api/gmail/trash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId: message.id }),
+      })
+    } finally {
+      setTrashingMail(false)
+      setShowOverlegModal(false)
     }
   }
 
@@ -408,69 +469,136 @@ function MailItem({
 
       {/* Overleg aanmaken modal */}
       {showOverlegModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowOverlegModal(false)} />
-          <div className="relative bg-white rounded-2xl w-full max-w-md mx-4 shadow-xl">
-            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => { setShowOverlegModal(false); setOverlegAangemaakt(false) }} />
+          <div className="relative bg-white rounded-2xl w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
               <h2 className="text-base font-semibold text-gray-900">Overleg aanmaken</h2>
-              <button onClick={() => setShowOverlegModal(false)} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+              <button onClick={() => { setShowOverlegModal(false); setOverlegAangemaakt(false) }} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
                 <X size={18} />
               </button>
             </div>
-            <div className="p-4 space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Titel</label>
-                <input
-                  type="text"
-                  value={overlegTitel}
-                  onChange={(e) => setOverlegTitel(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59]"
-                />
+
+            {overlegAangemaakt ? (
+              /* Bevestiging na opslaan */
+              <div className="p-6 text-center space-y-4">
+                <div className="w-12 h-12 rounded-full bg-[#4A7C59]/10 flex items-center justify-center mx-auto">
+                  <CalendarPlus size={22} className="text-[#4A7C59]" />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">Overleg aangemaakt!</p>
+                  <p className="text-sm text-[#6B7280] mt-1">Wat wil je doen met deze mail?</p>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={handleTrashMail}
+                    disabled={trashingMail}
+                    className="flex-1 py-2.5 rounded-xl border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    {trashingMail ? 'Bezig...' : 'Verwijder mail'}
+                  </button>
+                  <button
+                    onClick={() => { setShowOverlegModal(false); setOverlegAangemaakt(false) }}
+                    className="flex-1 py-2.5 rounded-xl bg-[#4A7C59] text-white text-sm font-medium hover:bg-[#3d6a4a] transition-colors"
+                  >
+                    Bewaar mail
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Datum en tijd</label>
-                <input
-                  type="datetime-local"
-                  value={overlegDatum}
-                  onChange={(e) => setOverlegDatum(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59]"
-                />
+            ) : (
+              /* Formulier */
+              <div className="p-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Titel</label>
+                  <input
+                    type="text"
+                    value={overlegTitel}
+                    onChange={(e) => setOverlegTitel(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Datum en tijd</label>
+                  <input
+                    type="datetime-local"
+                    value={overlegDatum}
+                    onChange={(e) => { setOverlegDatum(e.target.value); setDatumHerkend(false) }}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59]"
+                  />
+                  {datumHerkend && (
+                    <p className="text-xs text-[#4A7C59] mt-1 flex items-center gap-1">
+                      <span>✓</span> Datum herkend uit mail
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-2">Type</label>
+                  <div className="flex gap-2">
+                    {(['fysiek', 'online', 'telefoon'] as const).map((type) => (
+                      <label key={type} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border text-xs font-medium cursor-pointer transition-colors ${
+                        overlegType === type
+                          ? 'border-[#4A7C59] bg-[#4A7C59]/10 text-[#4A7C59]'
+                          : 'border-gray-200 text-[#6B7280] hover:bg-gray-50'
+                      }`}>
+                        <input type="radio" name="overlegType" value={type} checked={overlegType === type} onChange={() => setOverlegType(type)} className="sr-only" />
+                        {type === 'fysiek' ? '📍' : type === 'online' ? '💻' : '📞'}
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    {overlegType === 'fysiek' ? 'Locatie' : overlegType === 'online' ? 'Meeting link' : 'Telefoonnummer'}
+                  </label>
+                  <input
+                    type={overlegType === 'online' ? 'url' : 'text'}
+                    value={overlegLocatie}
+                    onChange={(e) => setOverlegLocatie(e.target.value)}
+                    placeholder={
+                      overlegType === 'fysiek' ? 'Adres of locatie' :
+                      overlegType === 'online' ? 'Meeting link (Teams, Zoom etc.)' :
+                      'Telefoonnummer'
+                    }
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Aanwezigen</label>
+                  <input
+                    type="text"
+                    value={overlegAanwezigen}
+                    onChange={(e) => setOverlegAanwezigen(e.target.value)}
+                    placeholder="Bijv. Mama, Papa, Begeleider..."
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Notities</label>
+                  <textarea
+                    value={overlegNotities}
+                    onChange={(e) => setOverlegNotities(e.target.value)}
+                    rows={3}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59] resize-none"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => setShowOverlegModal(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-[#6B7280] hover:bg-gray-50 transition-colors"
+                  >
+                    Annuleren
+                  </button>
+                  <button
+                    onClick={handleSaveOverleg}
+                    disabled={savingOverleg || !overlegTitel.trim() || !overlegDatum}
+                    className="flex-1 py-2.5 rounded-xl bg-[#4A7C59] text-white text-sm font-medium hover:bg-[#3d6a4a] transition-colors disabled:opacity-50"
+                  >
+                    {savingOverleg ? 'Opslaan...' : 'Opslaan'}
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Aanwezigen</label>
-                <input
-                  type="text"
-                  value={overlegAanwezigen}
-                  onChange={(e) => setOverlegAanwezigen(e.target.value)}
-                  placeholder="Bijv. Mama, Papa, Begeleider..."
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Notities</label>
-                <textarea
-                  value={overlegNotities}
-                  onChange={(e) => setOverlegNotities(e.target.value)}
-                  rows={3}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59] resize-none"
-                />
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={() => setShowOverlegModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-[#6B7280] hover:bg-gray-50 transition-colors"
-                >
-                  Annuleren
-                </button>
-                <button
-                  onClick={handleSaveOverleg}
-                  disabled={savingOverleg || !overlegTitel.trim() || !overlegDatum}
-                  className="flex-1 py-2.5 rounded-xl bg-[#4A7C59] text-white text-sm font-medium hover:bg-[#3d6a4a] transition-colors disabled:opacity-50"
-                >
-                  {savingOverleg ? 'Opslaan...' : 'Opslaan'}
-                </button>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}

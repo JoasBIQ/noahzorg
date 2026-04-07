@@ -16,6 +16,9 @@ import {
   ChevronDown,
   Users,
   MessageSquare,
+  MapPin,
+  Monitor,
+  Phone,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRealtime } from '@/hooks/use-realtime'
@@ -189,16 +192,38 @@ export function OverleggenPage({
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-gray-900 text-sm">{overleg.titel}</h3>
+                            {/* Type badge */}
+                            <div className="flex items-center gap-2 mb-1.5">
+                              {overleg.type_overleg === 'online' ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-2 py-0.5">
+                                  <Monitor size={11} /> Online
+                                </span>
+                              ) : overleg.type_overleg === 'telefoon' ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-100 rounded-full px-2 py-0.5">
+                                  <Phone size={11} /> Telefoon
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-[#4A7C59] bg-[#4A7C59]/10 border border-[#4A7C59]/20 rounded-full px-2 py-0.5">
+                                  <MapPin size={11} /> Fysiek
+                                </span>
+                              )}
+                            </div>
+                            <h3 className="font-semibold text-gray-900">{overleg.titel}</h3>
+                            {/* Datum/tijd prominent */}
+                            <p className="text-base font-medium text-gray-700 mt-1">
+                              {formatDateTime(overleg.datum_tijd)}
+                            </p>
                             <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-muted">
-                              <span className="flex items-center gap-1">
-                                <Calendar size={12} />
-                                {formatDateTime(overleg.datum_tijd)}
-                              </span>
                               {((overleg as any).aanwezigen_tekst || overleg.aanwezigen?.length > 0) && (
                                 <span className="flex items-center gap-1">
                                   <Users size={12} />
                                   {(overleg as any).aanwezigen_tekst || `${overleg.aanwezigen.length} aanwezig`}
+                                </span>
+                              )}
+                              {overleg.locatie && overleg.type_overleg !== 'online' && (
+                                <span className="flex items-center gap-1">
+                                  {overleg.type_overleg === 'telefoon' ? <Phone size={12} /> : <MapPin size={12} />}
+                                  {overleg.locatie}
                                 </span>
                               )}
                               {isFirst && trelloCards.length > 0 && (
@@ -208,6 +233,20 @@ export function OverleggenPage({
                                 </span>
                               )}
                             </div>
+                            {/* Online meeting link prominent */}
+                            {overleg.locatie && overleg.type_overleg === 'online' && (
+                              <a
+                                href={overleg.locatie}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1.5 mt-2 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                              >
+                                <Monitor size={14} />
+                                Deelnemen aan meeting
+                                <ExternalLink size={12} />
+                              </a>
+                            )}
                           </div>
                           <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
                             <ChevronDown size={16} className="text-gray-400" />

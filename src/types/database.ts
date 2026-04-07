@@ -426,6 +426,8 @@ export interface Database {
           gearchiveerd: boolean
           aanwezigen_tekst: string | null
           bron: string
+          locatie: string | null
+          type_overleg: 'fysiek' | 'online' | 'telefoon'
         }
         Insert: {
           id?: string
@@ -441,6 +443,8 @@ export interface Database {
           gearchiveerd?: boolean
           aanwezigen_tekst?: string | null
           bron?: string
+          locatie?: string | null
+          type_overleg?: 'fysiek' | 'online' | 'telefoon'
         }
         Update: {
           titel?: string
@@ -453,6 +457,8 @@ export interface Database {
           drive_opname_id?: string | null
           aanwezigen_tekst?: string | null
           bron?: string
+          locatie?: string | null
+          type_overleg?: 'fysiek' | 'online' | 'telefoon'
         }
       }
       app_instellingen: {
