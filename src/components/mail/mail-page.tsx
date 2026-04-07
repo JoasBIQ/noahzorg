@@ -219,12 +219,14 @@ function MailItem({
   currentProfile,
   heeftOngelezen = false,
   onOverlegGelezen,
+  onRemove,
 }: {
   message: GmailMessage
   tab: MailTab
   currentProfile: Profile
   heeftOngelezen?: boolean
   onOverlegGelezen?: () => void
+  onRemove?: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const [showDiscussion, setShowDiscussion] = useState(false)
@@ -314,9 +316,10 @@ function MailItem({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messageId: message.id }),
       })
+      setShowOverlegModal(false)
+      onRemove?.(message.id)
     } finally {
       setTrashingMail(false)
-      setShowOverlegModal(false)
     }
   }
 
@@ -1056,6 +1059,7 @@ export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailE
                     currentProfile={currentProfile}
                     heeftOngelezen={ongelezenOverleg.has(message.id)}
                     onOverlegGelezen={() => setOngelezenOverleg((prev) => { const next = new Set(prev); next.delete(message.id); return next })}
+                    onRemove={(id) => setMessagesByTab((prev) => ({ ...prev, [activeTab]: prev[activeTab].filter((m) => m.id !== id) }))}
                   />
                 </motion.div>
               ))}
@@ -1099,6 +1103,7 @@ export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailE
                     currentProfile={currentProfile}
                     heeftOngelezen={ongelezenOverleg.has(message.id)}
                     onOverlegGelezen={() => setOngelezenOverleg((prev) => { const next = new Set(prev); next.delete(message.id); return next })}
+                    onRemove={(id) => setMessagesByTab((prev) => ({ ...prev, [activeTab]: prev[activeTab].filter((m) => m.id !== id) }))}
                   />
                 </motion.div>
               ))}
