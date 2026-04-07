@@ -190,6 +190,7 @@ export interface GmailMessage {
   threadId: string
   subject: string
   from: string
+  to: string
   date: string
   snippet: string
   body: string
@@ -268,6 +269,7 @@ export async function getMessages(
         threadId: msg.data.threadId ?? '',
         subject: getHeader('subject') || '(geen onderwerp)',
         from: getHeader('from'),
+        to: getHeader('to'),
         date: getHeader('date'),
         snippet: msg.data.snippet ?? '',
         body: extractBody(msg.data.payload),

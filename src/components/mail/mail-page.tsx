@@ -32,6 +32,7 @@ interface GmailMessage {
   threadId: string
   subject: string
   from: string
+  to: string
   date: string
   snippet: string
   body: string
@@ -217,15 +218,11 @@ function MailItem({
     }
   }
 
-  // Verzonden: toon ontvanger, Inbox: toon afzender, Concept: geen afzender
+  // Verzonden: toon ontvanger (To-header), Inbox: toon afzender, Concept: geen afzender
   const displayName = isDraft
     ? null
     : isSent
-    ? (() => {
-        // Probeer To-header te parsen uit snippet of gebruik afzender als fallback
-        const { naam } = parseFrom(message.from)
-        return naam
-      })()
+    ? parseFrom(message.to || message.from).naam
     : parseFrom(message.from).naam
 
   const { email: senderEmail } = parseFrom(message.from)
