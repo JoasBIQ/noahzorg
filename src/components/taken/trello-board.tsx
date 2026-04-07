@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { ExternalLink, CheckSquare, Clock, Send, MessageCircle, Plus, X } from 'lucide-react'
+import { ExternalLink, CheckSquare, Clock, Send, MessageCircle, Plus, X, Archive, HelpCircle, Mail, Copy, Check, ArrowRight, Trash2, GripVertical } from 'lucide-react'
 import { DragDropContext, Draggable, type DropResult } from '@hello-pangea/dnd'
 import { StrictModeDroppable } from '@/components/ui/strict-mode-droppable'
 import { Button } from '@/components/ui/button'
@@ -177,16 +177,136 @@ function getCurrentUrgentie(card: TrelloCard | null): string {
   return ''
 }
 
+const TRELLO_EMAIL = 'joas_businessiq+ly8sqnaedjollpbggxum@boards.trello.com'
+
+function TakenInfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [copied, setCopied] = useState(false)
+
+  const copyEmail = () => {
+    navigator.clipboard.writeText(TRELLO_EMAIL)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <Modal title="Hoe werken taken?" open={open} onClose={onClose}>
+      <div className="space-y-6 text-sm text-gray-700">
+
+        {/* Nieuwe taak aanmaken */}
+        <section>
+          <h3 className="flex items-center gap-2 font-semibold text-gray-900 mb-3">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#4A7C59]/10 text-[#4A7C59] text-xs font-bold flex-shrink-0">+</div>
+            Nieuwe taak aanmaken
+          </h3>
+          <ol className="space-y-3">
+            <li className="flex gap-3">
+              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[#4A7C59] text-white text-xs font-bold mt-0.5">1</span>
+              <span>Klik op <strong>&quot;+ Kaart toevoegen&quot;</strong> onderaan een lijst op het bord.</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[#4A7C59] text-white text-xs font-bold mt-0.5">2</span>
+              <div className="flex-1">
+                <p className="mb-1.5">Stuur een e-mail naar het Trello-bord. De onderwerpregel wordt de taaknaam, en de e-mail komt automatisch in de <strong>Inbox</strong> terecht.</p>
+                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  <Mail size={14} className="text-[#4A7C59] flex-shrink-0" />
+                  <a
+                    href={`mailto:${TRELLO_EMAIL}`}
+                    className="flex-1 text-xs font-mono text-[#4A7C59] hover:underline break-all"
+                  >
+                    {TRELLO_EMAIL}
+                  </a>
+                  <button onClick={copyEmail} className="flex-shrink-0 text-[#6B7280] hover:text-gray-900 transition-colors">
+                    {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+                  </button>
+                </div>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[#4A7C59] text-white text-xs font-bold mt-0.5">3</span>
+              <span>Klik op <strong>&quot;Maak taak&quot;</strong> bij een notitie in het logboek.</span>
+            </li>
+          </ol>
+        </section>
+
+        <div className="border-t border-gray-100" />
+
+        {/* Taak verplaatsen */}
+        <section>
+          <h3 className="flex items-center gap-2 font-semibold text-gray-900 mb-3">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-blue-600 flex-shrink-0">
+              <GripVertical size={13} />
+            </div>
+            Taak verplaatsen
+          </h3>
+          <p className="mb-3 text-[#6B7280]">Sleep een kaart van de ene naar de andere lijst om de status te wijzigen.</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {[
+              { label: 'Inbox', color: 'bg-gray-100 text-gray-700' },
+              { label: 'In behandeling', color: 'bg-blue-50 text-blue-700' },
+              { label: 'Gereed', color: 'bg-green-50 text-green-700' },
+            ].map((step, i, arr) => (
+              <div key={step.label} className="flex items-center gap-2">
+                <span className={`rounded-lg px-2.5 py-1 text-xs font-medium ${step.color}`}>
+                  {step.label}
+                </span>
+                {i < arr.length - 1 && <ArrowRight size={14} className="text-gray-400 flex-shrink-0" />}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="border-t border-gray-100" />
+
+        {/* Taak archiveren */}
+        <section>
+          <h3 className="flex items-center gap-2 font-semibold text-gray-900 mb-3">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-orange-50 text-orange-500 flex-shrink-0">
+              <Archive size={13} />
+            </div>
+            Taak archiveren
+          </h3>
+          <p className="text-[#6B7280]">
+            Klik op een kaart en gebruik de <strong className="text-gray-700">&quot;Archiveer&quot;</strong> knop onderaan de modal. De taak verdwijnt uit het bord en wordt naar de Archief-lijst in Trello verplaatst.
+          </p>
+        </section>
+
+        <div className="border-t border-gray-100" />
+
+        {/* Urgentie */}
+        <section>
+          <h3 className="flex items-center gap-2 font-semibold text-gray-900 mb-3">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-red-50 text-red-500 flex-shrink-0">
+              <Clock size={13} />
+            </div>
+            Urgentie instellen
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">Lage urgentie</span>
+            <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">Middel urgentie</span>
+            <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Hoge urgentie</span>
+          </div>
+          <p className="mt-2 text-[#6B7280]">Stel urgentie in via het dropdown-menu in de kaartdetails. Dit is zichtbaar als een gekleurde markering op de kaart.</p>
+        </section>
+
+      </div>
+    </Modal>
+  )
+}
+
 function CardDetailModal({
   card,
   open,
   onClose,
   onUrgentieChanged,
+  archieefListId,
+  onArchived,
 }: {
   card: TrelloCard | null
   open: boolean
   onClose: () => void
   onUrgentieChanged?: (cardId: string, urgentie: string) => void
+  archieefListId?: string | null
+  onArchived?: (cardId: string) => void
 }) {
   const [comments, setComments] = useState<TrelloComment[]>([])
   const [loadingComments, setLoadingComments] = useState(false)
@@ -194,6 +314,7 @@ function CardDetailModal({
   const [sending, setSending] = useState(false)
   const [urgentie, setUrgentie] = useState('')
   const [savingUrgentie, setSavingUrgentie] = useState(false)
+  const [archiving, setArchiving] = useState(false)
 
   useEffect(() => {
     setUrgentie(getCurrentUrgentie(card))
@@ -214,6 +335,26 @@ function CardDetailModal({
       console.error('Urgentie bijwerken mislukt:', err)
     } finally {
       setSavingUrgentie(false)
+    }
+  }
+
+  const handleArchive = async () => {
+    if (!card || !archieefListId || archiving) return
+    setArchiving(true)
+    try {
+      const res = await fetch('/api/trello/card', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId: card.id, idList: archieefListId }),
+      })
+      if (res.ok) {
+        onArchived?.(card.id)
+        onClose()
+      }
+    } catch (err) {
+      console.error('Archiveren mislukt:', err)
+    } finally {
+      setArchiving(false)
     }
   }
 
@@ -397,7 +538,7 @@ function CardDetailModal({
           )}
         </div>
 
-        <div className="pt-2 border-t border-gray-100">
+        <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-3">
           <a
             href={card.url}
             target="_blank"
@@ -407,6 +548,17 @@ function CardDetailModal({
             <ExternalLink size={14} />
             Openen in Trello
           </a>
+
+          {archieefListId && (
+            <button
+              onClick={handleArchive}
+              disabled={archiving}
+              className="flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-red-600 transition-colors disabled:opacity-50"
+            >
+              <Archive size={14} />
+              {archiving ? 'Archiveren...' : 'Archiveer'}
+            </button>
+          )}
         </div>
       </div>
     </Modal>
@@ -518,6 +670,7 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: Tr
   const [selectedCard, setSelectedCard] = useState<TrelloCard | null>(null)
   const [debugInfo, setDebugInfo] = useState<string | null>(null)
   const [addingToList, setAddingToList] = useState<string | null>(null)
+  const [showInfo, setShowInfo] = useState(false)
   const [prefillTekst, setPrefillTekst] = useState<string | undefined>(initialTaakTekst)
   const didAutoOpen = useRef(false)
 
@@ -693,13 +846,22 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: Tr
             <p className="text-xs text-[#6B7280] mt-0.5">Taken worden gesynchroniseerd met Trello</p>
           )}
         </div>
-        <button
-          onClick={() => window.open(boardUrl, '_blank')}
-          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors"
-        >
-          <ExternalLink size={14} />
-          Open in Trello
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowInfo(true)}
+            className="flex items-center justify-center w-8 h-8 rounded-full text-[#6B7280] hover:text-[#4A7C59] hover:bg-[#4A7C59]/10 transition-colors"
+            title="Hoe werken taken?"
+          >
+            <HelpCircle size={18} />
+          </button>
+          <button
+            onClick={() => window.open(boardUrl, '_blank')}
+            className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors"
+          >
+            <ExternalLink size={14} />
+            Open in Trello
+          </button>
+        </div>
       </motion.div>
 
       {debugInfo && (
@@ -807,11 +969,24 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: Tr
         </motion.div>
       </DragDropContext>
 
+      {/* Info Modal */}
+      <TakenInfoModal open={showInfo} onClose={() => setShowInfo(false)} />
+
       {/* Card Detail Modal */}
       <CardDetailModal
         card={selectedCard}
         open={!!selectedCard}
         onClose={() => setSelectedCard(null)}
+        archieefListId={lists.find((l) => l.name.toLowerCase() === 'archief')?.id ?? null}
+        onArchived={(cardId) => {
+          setLists((prev) =>
+            prev.map((list) => ({
+              ...list,
+              cards: list.cards.filter((c) => c.id !== cardId),
+            }))
+          )
+          setSelectedCard(null)
+        }}
         onUrgentieChanged={(cardId, newUrgentie) => {
           const URGENTIE_LABEL_MAP: Record<string, { color: string; naam: string }> = {
             laag: { color: 'green', naam: 'Lage urgentie' },
