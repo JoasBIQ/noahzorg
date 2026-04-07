@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { AppShell } from '@/components/layout/app-shell'
 import { TeamPage } from '@/components/team/team-page'
 import type { Profile } from '@/types'
@@ -31,12 +32,23 @@ export default async function TeamRoute() {
   const profile = currentProfile as unknown as Profile
   const isBeheerder = profile?.rol === 'beheerder'
 
+  // Fetch all auth users to determine email confirmation status
+  const adminClient = createAdminClient()
+  const { data: { users } } = await adminClient.auth.admin.listUsers({ perPage: 1000 })
+
+  const emailBevestigd: Record<string, boolean> = {}
+  for (const u of users) {
+    emailBevestigd[u.id] = !!u.email_confirmed_at
+  }
+
   return (
     <AppShell>
       <TeamPage
         profiles={(profiles ?? []) as unknown as Profile[]}
         currentProfile={profile}
         isBeheerder={isBeheerder}
+        emailBevestigd={emailBevestigd}
+        currentUserId={user.id}
       />
     </AppShell>
   )

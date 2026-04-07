@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, UserPlus, Mail } from 'lucide-react'
+import { UserPlus, Mail } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,8 @@ interface TeamPageProps {
   profiles: Profile[]
   currentProfile: Profile
   isBeheerder: boolean
+  emailBevestigd: Record<string, boolean>
+  currentUserId: string
 }
 
 const containerVariants = {
@@ -37,7 +39,8 @@ const KLEUR_OPTIONS = USER_COLORS.map((kleur, index) => ({
   label: ['Blauw', 'Groen', 'Geel', 'Roze', 'Paars', 'Oranje'][index],
 }))
 
-export function TeamPage({ profiles, currentProfile, isBeheerder }: TeamPageProps) {
+export function TeamPage({ profiles: initialProfiles, currentProfile, isBeheerder, emailBevestigd, currentUserId }: TeamPageProps) {
+  const [localProfiles, setLocalProfiles] = useState<Profile[]>(initialProfiles)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [email, setEmail] = useState('')
   const [naam, setNaam] = useState('')
@@ -54,6 +57,40 @@ export function TeamPage({ profiles, currentProfile, isBeheerder }: TeamPageProp
     setKleur(USER_COLORS[0])
     setError(null)
     setSuccess(null)
+  }
+
+  const handleRolChange = async (userId: string, newRol: 'gebruiker' | 'beheerder') => {
+    const response = await fetch('/api/team/update-rol', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, rol: newRol }),
+    })
+
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.error || 'Er ging iets mis bij het wijzigen van de rol.')
+    }
+
+    setLocalProfiles((prev) =>
+      prev.map((p) => (p.id === userId ? { ...p, rol: newRol } : p))
+    )
+  }
+
+  const handleDeactivate = async (userId: string) => {
+    const response = await fetch('/api/team/deactivate', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    })
+
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.error || 'Er ging iets mis bij het deactiveren.')
+    }
+
+    setLocalProfiles((prev) =>
+      prev.map((p) => (p.id === userId ? { ...p, actief: false } : p))
+    )
   }
 
   const handleInvite = async () => {
@@ -112,8 +149,16 @@ export function TeamPage({ profiles, currentProfile, isBeheerder }: TeamPageProp
           animate="visible"
           className="grid grid-cols-2 gap-4 lg:grid-cols-3"
         >
-          {profiles.map((profile) => (
-            <TeamMemberCard key={profile.id} profile={profile} />
+          {localProfiles.map((profile) => (
+            <TeamMemberCard
+              key={profile.id}
+              profile={profile}
+              isBeheerder={isBeheerder}
+              currentUserId={currentUserId}
+              emailBevestigd={emailBevestigd[profile.id] ?? false}
+              onRolChange={handleRolChange}
+              onDeactivate={handleDeactivate}
+            />
           ))}
         </motion.div>
       </div>

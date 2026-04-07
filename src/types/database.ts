@@ -34,6 +34,7 @@ export interface Database {
           rol: UserRole
           kleur: string
           created_at: string
+          actief: boolean
         }
         Insert: {
           id: string
@@ -41,12 +42,14 @@ export interface Database {
           rol?: UserRole
           kleur?: string
           created_at?: string
+          actief?: boolean
         }
         Update: {
           id?: string
           naam?: string
           rol?: UserRole
           kleur?: string
+          actief?: boolean
         }
       }
       noah_profiel: {
