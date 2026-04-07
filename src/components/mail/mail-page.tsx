@@ -417,6 +417,9 @@ export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailE
   const [schrijfAan, setSchrijfAan] = useState('')
   const [schrijfOnderwerp, setSchrijfOnderwerp] = useState('')
   const [schrijfBericht, setSchrijfBericht] = useState('')
+  const [verzenden, setVerzenden] = useState(false)
+  const [verzendFout, setVerzendFout] = useState<string | null>(null)
+  const [verzendSucces, setVerzendSucces] = useState(false)
 
   // Zoeken
   const [searchInput, setSearchInput] = useState('')
@@ -447,6 +450,39 @@ export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailE
       setRefreshing(false)
     }
   }, [])
+
+  const handleVerzenden = async () => {
+    if (!schrijfAan.trim() || !schrijfBericht.trim() || verzenden) return
+    setVerzenden(true)
+    setVerzendFout(null)
+    try {
+      const res = await fetch('/api/gmail/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aan: schrijfAan.trim(),
+          onderwerp: schrijfOnderwerp.trim(),
+          bericht: schrijfBericht.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setVerzendFout(data.error ?? 'Verzenden mislukt. Probeer het opnieuw.')
+      } else {
+        setShowSchrijfModal(false)
+        setSchrijfAan('')
+        setSchrijfOnderwerp('')
+        setSchrijfBericht('')
+        setVerzendFout(null)
+        setVerzendSucces(true)
+        setTimeout(() => setVerzendSucces(false), 4000)
+      }
+    } catch {
+      setVerzendFout('Netwerk fout. Controleer je verbinding.')
+    } finally {
+      setVerzenden(false)
+    }
+  }
 
   const runSearch = useCallback(async (q: string) => {
     const trimmed = q.trim()
@@ -580,6 +616,14 @@ export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailE
         </div>
       </div>
 
+      {/* Mail verstuurd melding */}
+      {verzendSucces && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 bg-[#4A7C59] text-white px-5 py-3 rounded-full shadow-lg text-sm font-medium animate-fade-in">
+          <Send size={15} />
+          Mail verstuurd
+        </div>
+      )}
+
       {/* Schrijf mail modal */}
       {showSchrijfModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -628,21 +672,36 @@ export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailE
                   className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59] transition-colors resize-none"
                 />
               </div>
+              {verzendFout && (
+                <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2.5 text-sm text-red-700">
+                  {verzendFout}
+                </div>
+              )}
               <div className="flex gap-2 pt-1">
                 <button
-                  onClick={() => setShowSchrijfModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-[#6B7280] hover:bg-gray-50 transition-colors"
+                  onClick={() => { setShowSchrijfModal(false); setVerzendFout(null) }}
+                  disabled={verzenden}
+                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-[#6B7280] hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
                   Annuleren
                 </button>
-                <a
-                  href={`mailto:${schrijfAan}?subject=${encodeURIComponent(schrijfOnderwerp)}&body=${encodeURIComponent(schrijfBericht)}`}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#4A7C59] text-white text-sm font-medium hover:bg-[#3d6a4a] transition-colors"
-                  onClick={() => setShowSchrijfModal(false)}
+                <button
+                  onClick={handleVerzenden}
+                  disabled={verzenden || !schrijfAan.trim() || !schrijfBericht.trim()}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#4A7C59] text-white text-sm font-medium hover:bg-[#3d6a4a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Send size={14} />
-                  Verzenden
-                </a>
+                  {verzenden ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Verzenden...
+                    </>
+                  ) : (
+                    <>
+                      <Send size={14} />
+                      Verzenden
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
