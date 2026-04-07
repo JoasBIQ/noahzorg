@@ -1,0 +1,722 @@
+'use client'
+
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Mail,
+  RefreshCw,
+  ExternalLink,
+  Send,
+  MessageCircle,
+  ChevronDown,
+  ChevronUp,
+  Reply,
+  Inbox,
+  SendHorizonal,
+  FileText,
+  Search,
+  X,
+  Loader2,
+} from 'lucide-react'
+import { formatDistanceToNow } from 'date-fns'
+import { nl } from 'date-fns/locale'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Avatar } from '@/components/ui/avatar'
+import type { Profile } from '@/types'
+
+type MailTab = 'INBOX' | 'SENT' | 'DRAFT'
+
+interface GmailMessage {
+  id: string
+  threadId: string
+  subject: string
+  from: string
+  date: string
+  snippet: string
+  body: string
+  labelIds: string[]
+  gelezen: boolean
+}
+
+interface MailReactie {
+  id: string
+  gmail_message_id: string
+  auteur_id: string
+  bericht: string
+  created_at: string
+  profiles: {
+    naam: string
+    kleur: string
+  }
+}
+
+interface MailPageProps {
+  isBeheerder: boolean
+  currentProfile: Profile
+  initialConnected: boolean
+  gmailEmail?: string | null
+}
+
+function parseFrom(from: string): { naam: string; email: string } {
+  const match = from.match(/^"?([^"<]+?)"?\s*<([^>]+)>$/)
+  if (match) {
+    return { naam: match[1].trim(), email: match[2].trim() }
+  }
+  return { naam: from, email: from }
+}
+
+function MailDiscussion({
+  messageId,
+  currentProfile,
+}: {
+  messageId: string
+  currentProfile: Profile
+}) {
+  const [reacties, setReacties] = useState<MailReactie[]>([])
+  const [loading, setLoading] = useState(true)
+  const [nieuw, setNieuw] = useState('')
+  const [sending, setSending] = useState(false)
+
+  const fetchReacties = useCallback(async () => {
+    const res = await fetch(`/api/gmail/reacties?messageId=${messageId}`)
+    const data = await res.json()
+    setReacties(data.reacties ?? [])
+    setLoading(false)
+  }, [messageId])
+
+  useEffect(() => {
+    fetchReacties()
+  }, [fetchReacties])
+
+  const handleSend = async () => {
+    if (!nieuw.trim() || sending) return
+    setSending(true)
+    try {
+      const res = await fetch('/api/gmail/reacties', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId, bericht: nieuw.trim() }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setReacties((prev) => [...prev, data.reactie])
+        setNieuw('')
+      }
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="border-t border-gray-100 pt-4 mt-4">
+      <h4 className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-3 flex items-center gap-1.5">
+        <MessageCircle size={12} />
+        Overleg
+      </h4>
+
+      {loading ? (
+        <p className="text-xs text-[#6B7280] animate-pulse">Laden...</p>
+      ) : reacties.length > 0 ? (
+        <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
+          {reacties.map((r) => (
+            <div key={r.id} className="flex items-start gap-2">
+              <Avatar
+                naam={r.profiles?.naam ?? 'Onbekend'}
+                kleur={r.profiles?.kleur ?? '#6B7280'}
+                size="sm"
+              />
+              <div className="flex-1 bg-gray-50 rounded-lg px-3 py-2">
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="text-xs font-semibold text-gray-700">
+                    {r.profiles?.naam ?? 'Onbekend'}
+                  </span>
+                  <span className="text-xs text-[#6B7280]">
+                    {formatDistanceToNow(new Date(r.created_at), { addSuffix: true, locale: nl })}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{r.bericht}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-[#6B7280] mb-3">
+          Nog geen reacties — schrijf als eerste.
+        </p>
+      )}
+
+      <div className="flex gap-2">
+        <Avatar naam={currentProfile.naam} kleur={currentProfile.kleur} size="sm" />
+        <div className="flex-1 flex gap-2">
+          <input
+            type="text"
+            value={nieuw}
+            onChange={(e) => setNieuw(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                handleSend()
+              }
+            }}
+            placeholder="Schrijf een reactie..."
+            className="flex-1 text-sm rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59]"
+          />
+          <button
+            onClick={handleSend}
+            disabled={!nieuw.trim() || sending}
+            className="flex items-center justify-center w-9 h-9 rounded-lg bg-[#4A7C59] text-white hover:bg-[#3d6a4a] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+          >
+            <Send size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MailItem({
+  message,
+  tab,
+  currentProfile,
+  heeftOngelezen = false,
+  onOverlegGelezen,
+}: {
+  message: GmailMessage
+  tab: MailTab
+  currentProfile: Profile
+  heeftOngelezen?: boolean
+  onOverlegGelezen?: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [showDiscussion, setShowDiscussion] = useState(false)
+  const [gelezen, setGelezen] = useState(message.gelezen)
+  const [localOngelezen, setLocalOngelezen] = useState(heeftOngelezen)
+
+  useEffect(() => {
+    setLocalOngelezen(heeftOngelezen)
+  }, [heeftOngelezen])
+
+  const isDraft = tab === 'DRAFT'
+  const isSent = tab === 'SENT'
+  // Ongelezen = inbox-bericht dat deze gebruiker nog niet heeft geopend
+  const isUnread = tab === 'INBOX' && !gelezen
+
+  const handleToggle = async () => {
+    const wasOpen = open
+    setOpen(!wasOpen)
+    // Markeer als gelezen bij eerste openen (alleen inbox)
+    if (!wasOpen && !gelezen && tab === 'INBOX') {
+      setGelezen(true)
+      await fetch('/api/mail/leestatus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId: message.id }),
+      })
+    }
+  }
+
+  // Verzonden: toon ontvanger, Inbox: toon afzender, Concept: geen afzender
+  const displayName = isDraft
+    ? null
+    : isSent
+    ? (() => {
+        // Probeer To-header te parsen uit snippet of gebruik afzender als fallback
+        const { naam } = parseFrom(message.from)
+        return naam
+      })()
+    : parseFrom(message.from).naam
+
+  const { email: senderEmail } = parseFrom(message.from)
+  const replyHref = `mailto:${senderEmail}?subject=Re: ${encodeURIComponent(message.subject)}`
+
+  const avatarLetter = displayName ? displayName.charAt(0).toUpperCase() : '?'
+
+  return (
+    <div
+      className={`bg-white rounded-xl border transition-colors ${
+        isUnread ? 'border-[#4A7C59]/30 shadow-sm' :
+        localOngelezen ? 'border-orange-300 shadow-md shadow-orange-100' :
+        'border-gray-200'
+      } overflow-hidden`}
+    >
+      {/* Header */}
+      <button
+        onClick={handleToggle}
+        className="w-full text-left p-4 flex items-start gap-3 hover:bg-gray-50 transition-colors"
+      >
+        <div
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+          style={{ backgroundColor: isDraft ? '#9CA3AF' : '#4A7C59' }}
+        >
+          {isDraft ? <FileText size={16} /> : avatarLetter}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              {isUnread && (
+                <span className="flex-shrink-0 h-2 w-2 rounded-full bg-[#4A7C59]" />
+              )}
+              {displayName && (
+                <span className={`text-sm truncate ${isUnread ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                  {isSent ? `Aan: ${displayName}` : displayName}
+                </span>
+              )}
+              {isDraft && (
+                <span className="text-sm font-medium text-amber-600">Concept</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {localOngelezen && (
+                <span className="flex items-center gap-1 rounded-full bg-orange-500 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm">
+                  <MessageCircle size={11} />
+                  Nieuw overleg
+                </span>
+              )}
+              <span className="text-xs text-[#6B7280] mt-0.5">{message.date.slice(0, 16)}</span>
+            </div>
+          </div>
+          <p className={`text-sm truncate ${isUnread ? 'font-medium text-gray-800' : 'text-gray-600'}`}>
+            {message.subject}
+          </p>
+          {!open && (
+            <p className="text-xs text-[#6B7280] truncate mt-0.5">{message.snippet}</p>
+          )}
+        </div>
+
+        <span className="text-[#6B7280] flex-shrink-0 mt-1">
+          {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </span>
+      </button>
+
+      {/* Uitklapbaar lichaam */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 border-t border-gray-100">
+              <div className="mt-4 text-sm text-gray-700 whitespace-pre-wrap max-h-80 overflow-y-auto bg-gray-50 rounded-lg p-3 font-mono text-xs leading-relaxed">
+                {message.body || message.snippet}
+              </div>
+
+              {/* Acties — alleen bij Inbox */}
+              {!isDraft && (
+                <div className="flex items-center gap-3 mt-3">
+                  {!isSent && (
+                    <a
+                      href={replyHref}
+                      className="flex items-center gap-1.5 text-xs text-[#4A7C59] hover:underline font-medium"
+                    >
+                      <Reply size={14} />
+                      Beantwoorden in e-mail
+                    </a>
+                  )}
+
+                  {tab === 'INBOX' && (
+                    <button
+                      onClick={async () => {
+                        const opening = !showDiscussion
+                        setShowDiscussion(opening)
+                        if (opening && localOngelezen) {
+                          setLocalOngelezen(false)
+                          onOverlegGelezen?.()
+                          await fetch('/api/mail/reacties-leestatus', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ messageId: message.id }),
+                          })
+                        }
+                      }}
+                      className="relative flex items-center gap-1.5 text-xs text-[#6B7280] hover:text-gray-900 transition-colors ml-2"
+                    >
+                      <span className="relative">
+                        <MessageCircle size={14} />
+                        {localOngelezen && (
+                          <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-orange-500" />
+                        )}
+                      </span>
+                      {showDiscussion ? 'Overleg verbergen' : 'Overleg'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Overleg — alleen Inbox */}
+              {tab === 'INBOX' && showDiscussion && (
+                <MailDiscussion
+                  messageId={message.id}
+                  currentProfile={currentProfile}
+                />
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const TABS: { id: MailTab; label: string; icon: React.ComponentType<any>; emptyTitle: string; emptyDesc: string }[] = [
+  {
+    id: 'INBOX',
+    label: 'Inbox',
+    icon: Inbox,
+    emptyTitle: 'Geen berichten',
+    emptyDesc: 'Er zijn geen berichten in de inbox gevonden.',
+  },
+  {
+    id: 'SENT',
+    label: 'Verzonden',
+    icon: SendHorizonal,
+    emptyTitle: 'Geen verzonden mail',
+    emptyDesc: 'Er zijn geen verzonden berichten gevonden.',
+  },
+  {
+    id: 'DRAFT',
+    label: 'Concepten',
+    icon: FileText,
+    emptyTitle: 'Geen concepten',
+    emptyDesc: 'Er zijn geen concepten gevonden.',
+  },
+]
+
+export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailEmail }: MailPageProps) {
+  const [activeTab, setActiveTab] = useState<MailTab>('INBOX')
+  const [messagesByTab, setMessagesByTab] = useState<Record<MailTab, GmailMessage[]>>({
+    INBOX: [],
+    SENT: [],
+    DRAFT: [],
+  })
+  const [loadingTab, setLoadingTab] = useState<MailTab | null>(initialConnected ? 'INBOX' : null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const connected = initialConnected
+
+  // Ongelezen overleg-reacties per bericht
+  const [ongelezenOverleg, setOngelezenOverleg] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!initialConnected) return
+    fetch('/api/mail/reacties-leestatus')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.messageIds) setOngelezenOverleg(new Set(data.messageIds as string[]))
+      })
+      .catch(() => {})
+  }, [initialConnected])
+
+  // Zoeken
+  const [searchInput, setSearchInput] = useState('')
+  const [activeQuery, setActiveQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<GmailMessage[] | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const fetchTab = useCallback(async (tab: MailTab, isRefresh = false) => {
+    if (!isRefresh) setLoadingTab(tab)
+    else setRefreshing(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/gmail/messages?maxResults=25&label=${tab}`)
+      const data = await res.json()
+      if (data.error === 'token_expired') {
+        setError('Gmail koppeling verlopen. Koppel opnieuw via Beheer.')
+      } else if (data.error) {
+        setError(data.error)
+      } else {
+        setMessagesByTab((prev) => ({ ...prev, [tab]: data.messages ?? [] }))
+      }
+    } catch {
+      setError('Berichten ophalen mislukt.')
+    } finally {
+      setLoadingTab(null)
+      setRefreshing(false)
+    }
+  }, [])
+
+  const runSearch = useCallback(async (q: string) => {
+    const trimmed = q.trim()
+    if (!trimmed) {
+      setSearchResults(null)
+      setActiveQuery('')
+      return
+    }
+    setSearching(true)
+    setSearchError(null)
+    setActiveQuery(trimmed)
+    setSearchResults([]) // toon zoekpaneel direct zodat laad-indicator zichtbaar is
+    const url = `/api/gmail/messages?maxResults=25&q=${encodeURIComponent(trimmed)}`
+    try {
+      const res = await fetch(url)
+      const data = await res.json()
+      if (data.error === 'token_expired') {
+        setSearchError('Gmail koppeling verlopen. Koppel opnieuw via Beheer.')
+        setSearchResults([])
+      } else if (data.error) {
+        setSearchError(data.error)
+        setSearchResults([])
+      } else {
+        setSearchResults(data.messages ?? [])
+      }
+    } catch {
+      setSearchError('Zoeken mislukt.')
+      setSearchResults([])
+    } finally {
+      setSearching(false)
+    }
+  }, [])
+
+  const clearSearch = useCallback(() => {
+    setSearchInput('')
+    setActiveQuery('')
+    setSearchResults(null)
+    setSearchError(null)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+  }, [])
+
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!value.trim()) {
+      clearSearch()
+      return
+    }
+    if (value.trim().length >= 3) {
+      debounceRef.current = setTimeout(() => runSearch(value), 400)
+    }
+  }
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && searchInput.trim()) {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      runSearch(searchInput)
+    }
+    if (e.key === 'Escape') clearSearch()
+  }
+
+  // Laad actief tabblad als het nog niet geladen is
+  useEffect(() => {
+    if (!initialConnected) return
+    fetchTab(activeTab)
+  }, [activeTab, initialConnected, fetchTab])
+
+  if (!connected) {
+    return (
+      <div className="p-4 lg:p-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center justify-center text-center py-16"
+        >
+          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-[#4A7C59]/10 mb-6">
+            <Mail className="h-8 w-8 text-[#4A7C59]" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Mail</h1>
+          <p className="text-[#6B7280] max-w-md mb-6">
+            Verbind het Gmail-account om e-mails over Noah hier te lezen en samen te bespreken met de familie.
+          </p>
+          {isBeheerder ? (
+            <a
+              href="/api/gmail/auth"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[#4A7C59] text-white rounded-xl font-medium hover:bg-[#3d6a4a] transition-colors"
+            >
+              <ExternalLink size={16} />
+              Gmail koppelen
+            </a>
+          ) : (
+            <p className="text-sm text-[#6B7280]">
+              Vraag de beheerder om Gmail te koppelen via Beheer.
+            </p>
+          )}
+        </motion.div>
+      </div>
+    )
+  }
+
+  const currentTab = TABS.find((t) => t.id === activeTab)!
+  const messages = messagesByTab[activeTab]
+  const isLoading = loadingTab === activeTab
+
+  return (
+    <div className="p-4 lg:p-8">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Mail</h1>
+          {gmailEmail && (
+            <p className="text-sm text-[#6B7280] mt-0.5">{gmailEmail}</p>
+          )}
+        </div>
+        <button
+          onClick={() => fetchTab(activeTab, true)}
+          disabled={refreshing || isLoading}
+          className="flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-gray-900 transition-colors px-3 py-2 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+        >
+          <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+          <span className="hidden sm:inline">Vernieuwen</span>
+        </button>
+      </div>
+
+      {/* Zoekbalk */}
+      <div className="relative mb-4">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
+          placeholder="Zoek op afzender, onderwerp of inhoud..."
+          className="w-full rounded-xl border border-gray-200 bg-white pl-9 pr-9 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/20 focus:border-[#4A7C59] transition-colors"
+        />
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
+          {searching && (
+            <Loader2 size={15} className="animate-spin text-[#4A7C59]" />
+          )}
+          {searchInput && !searching && (
+            <button
+              onClick={clearSearch}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Zoekopdracht wissen"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Tabbladen — verborgen tijdens actieve zoekresultaten */}
+      {!searchResults && (
+        <div className="flex gap-1 mb-5 border-b border-gray-200">
+          {TABS.map((tab) => {
+            const Icon = tab.icon
+            const isActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                  isActive
+                    ? 'border-[#4A7C59] text-[#4A7C59]'
+                    : 'border-transparent text-[#6B7280] hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Icon size={15} />
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Zoekresultaten */}
+      {searchResults !== null ? (
+        <>
+          <div className="flex items-center gap-2 mb-4">
+            <p className="text-sm text-[#6B7280]">
+              {searching
+                ? `Zoeken naar "${activeQuery}"...`
+                : `${searchResults.length} resultaat${searchResults.length !== 1 ? 'en' : ''} voor "${activeQuery}"`}
+            </p>
+            <button
+              onClick={clearSearch}
+              className="text-xs text-[#4A7C59] hover:underline ml-auto"
+            >
+              Zoekopdracht wissen
+            </button>
+          </div>
+
+          {searchError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {searchError}
+            </div>
+          )}
+
+          {searching ? (
+            <div className="flex items-center justify-center py-16 gap-2 text-[#6B7280]">
+              <Loader2 size={18} className="animate-spin" />
+              <span className="text-sm">Zoeken...</span>
+            </div>
+          ) : searchResults.length === 0 ? (
+            <EmptyState
+              icon={Search}
+              title="Geen resultaten"
+              description={`Geen berichten gevonden voor "${activeQuery}".`}
+            />
+          ) : (
+            <motion.div
+              key={`search-${activeQuery}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-2"
+            >
+              {searchResults.map((message) => (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <MailItem
+                    message={message}
+                    tab={message.labelIds.includes('SENT') ? 'SENT' : message.labelIds.includes('DRAFT') ? 'DRAFT' : 'INBOX'}
+                    currentProfile={currentProfile}
+                    heeftOngelezen={ongelezenOverleg.has(message.id)}
+                    onOverlegGelezen={() => setOngelezenOverleg((prev) => { const next = new Set(prev); next.delete(message.id); return next })}
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </>
+      ) : (
+        <>
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="animate-pulse text-[#6B7280] text-sm">Laden...</div>
+            </div>
+          ) : messages.length === 0 ? (
+            <EmptyState
+              icon={currentTab.icon}
+              title={currentTab.emptyTitle}
+              description={currentTab.emptyDesc}
+            />
+          ) : (
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-2"
+            >
+              {messages.map((message) => (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <MailItem
+                    message={message}
+                    tab={activeTab}
+                    currentProfile={currentProfile}
+                    heeftOngelezen={ongelezenOverleg.has(message.id)}
+                    onOverlegGelezen={() => setOngelezenOverleg((prev) => { const next = new Set(prev); next.delete(message.id); return next })}
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}

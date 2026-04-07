@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx next:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s http://localhost:3001/login)",
+      "Bash(curl -s http://localhost:3001/_next/static/css/app/layout.css?v=1774814573957)",
+      "Bash(kill 67569)",
+      "Bash(rm -rf .next node_modules/.cache)",
+      "Bash(curl -s \"http://localhost:3001/_next/static/css/app/layout.css?v=1774815651882\")",
+      "Bash(xargs -r kill)",
+      "Bash(rm -rf .next)",
+      "Bash(xargs kill:*)",
+      "Bash(rm -rf node_modules/.cache)",
+      "Bash(rm -rf src/app/api/calendar/auth src/app/api/calendar/callback src/app/api/calendar/sync src/app/api/calendar/status)",
+      "Bash(rm -f src/lib/google-calendar.ts)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/login)",
+      "Bash(curl -s http://localhost:3001/api/trello/board)",
+      "Bash(npm ls:*)",
+      "Bash(curl -s \"http://localhost:3001/_next/static/css/app/layout.css?v=1774882885323\")",
+      "Bash(curl -s http://localhost:3001/)",
+      "Bash(curl -sL http://localhost:3001/ -w \"\\\\n%{http_code}\")",
+      "Bash(curl -s \"http://localhost:3001/_next/static/css/app/layout.css?v=1774885568560\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(npm run:*)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(pkill -f 'next dev')",
+      "Bash(rm -rf '/Users/joasdeinum/Google Drive/Claude Code/noahs-zorg/.next')",
+      "Bash(python3:*)",
+      "Bash(node scripts/test-overleg-badge.mjs)",
+      "Bash(node -e \":*)",
+      "Bash(node scripts/get-inbox-ids.mjs)",
+      "Bash(/usr/local/bin/node node_modules/.bin/tsc --noEmit)"
+    ]
+  }
+}
