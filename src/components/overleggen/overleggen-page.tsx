@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckSquare,
@@ -19,6 +19,11 @@ import {
   MapPin,
   Monitor,
   Phone,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  X,
+  Save,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRealtime } from '@/hooks/use-realtime'
@@ -79,6 +84,299 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 }
 
+// ── Edit modal ────────────────────────────────────────────────────────────────
+
+interface EditModalProps {
+  overleg: Overleg
+  onClose: () => void
+  onSaved: (updated: Overleg) => void
+}
+
+function EditModal({ overleg, onClose, onSaved }: EditModalProps) {
+  const supabase = createClient()
+  const [titel, setTitel] = useState(overleg.titel)
+  const [datumTijd, setDatumTijd] = useState(overleg.datum_tijd.slice(0, 16))
+  const [typeOverleg, setTypeOverleg] = useState<'fysiek' | 'online' | 'telefoon'>(overleg.type_overleg)
+  const [locatie, setLocatie] = useState(overleg.locatie ?? '')
+  const [aanwezigenTekst, setAanwezigenTekst] = useState(overleg.aanwezigen_tekst ?? '')
+  const [notities, setNotities] = useState(overleg.notities ?? '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const locatiePlaceholder =
+    typeOverleg === 'online' ? 'Meeting-link (bijv. https://meet.google.com/…)' :
+    typeOverleg === 'telefoon' ? 'Telefoonnummer of instructie' :
+    'Locatie (bijv. zorgkantoor Utrecht)'
+
+  async function handleSave() {
+    if (!titel.trim() || !datumTijd) { setError('Titel en datum zijn verplicht.'); return }
+    setSaving(true)
+    setError(null)
+    const { data, error: dbError } = await supabase
+      .from('overleggen')
+      .update({
+        titel: titel.trim(),
+        datum_tijd: new Date(datumTijd).toISOString(),
+        type_overleg: typeOverleg,
+        locatie: locatie.trim() || null,
+        aanwezigen_tekst: aanwezigenTekst.trim() || null,
+        notities: notities.trim() || null,
+      })
+      .eq('id', overleg.id)
+      .select()
+      .single()
+    setSaving(false)
+    if (dbError) { setError('Opslaan mislukt.'); return }
+    onSaved(data as Overleg)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-100">
+          <h2 className="font-semibold text-gray-900">Overleg bewerken</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+              <AlertCircle size={14} /> {error}
+            </div>
+          )}
+
+          {/* Titel */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Titel *</label>
+            <input
+              type="text"
+              value={titel}
+              onChange={(e) => setTitel(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+            />
+          </div>
+
+          {/* Datum & tijd */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Datum & tijd *</label>
+            <input
+              type="datetime-local"
+              value={datumTijd}
+              onChange={(e) => setDatumTijd(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+            />
+          </div>
+
+          {/* Type */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-2">Type</label>
+            <div className="flex gap-2">
+              {(['fysiek', 'online', 'telefoon'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTypeOverleg(t)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border text-sm font-medium transition-colors ${
+                    typeOverleg === t
+                      ? t === 'online' ? 'bg-blue-50 border-blue-300 text-blue-700'
+                        : t === 'telefoon' ? 'bg-purple-50 border-purple-300 text-purple-700'
+                        : 'bg-[#4A7C59]/10 border-[#4A7C59]/30 text-[#4A7C59]'
+                      : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  {t === 'fysiek' ? <MapPin size={13} /> : t === 'online' ? <Monitor size={13} /> : <Phone size={13} />}
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Locatie */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">
+              {typeOverleg === 'online' ? 'Meeting-link' : typeOverleg === 'telefoon' ? 'Telefoon' : 'Locatie'}
+            </label>
+            <input
+              type="text"
+              value={locatie}
+              onChange={(e) => setLocatie(e.target.value)}
+              placeholder={locatiePlaceholder}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+            />
+          </div>
+
+          {/* Aanwezigen */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Aanwezigen</label>
+            <input
+              type="text"
+              value={aanwezigenTekst}
+              onChange={(e) => setAanwezigenTekst(e.target.value)}
+              placeholder="bijv. Joas, mama, zorgmanager"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+            />
+          </div>
+
+          {/* Notities */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Notities</label>
+            <textarea
+              value={notities}
+              onChange={(e) => setNotities(e.target.value)}
+              rows={3}
+              placeholder="Eventuele aantekeningen..."
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-2 p-4 border-t border-gray-100">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Annuleren
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            Opslaan
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+// ── Delete confirm ────────────────────────────────────────────────────────────
+
+interface DeleteConfirmProps {
+  overleg: Overleg
+  onClose: () => void
+  onDeleted: (id: string) => void
+}
+
+function DeleteConfirm({ overleg, onClose, onDeleted }: DeleteConfirmProps) {
+  const supabase = createClient()
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleDelete() {
+    setDeleting(true)
+    await supabase.from('overleggen').update({ gearchiveerd: true }).eq('id', overleg.id)
+    onDeleted(overleg.id)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6"
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+            <Trash2 size={18} className="text-red-600" />
+          </div>
+          <h2 className="font-semibold text-gray-900">Overleg verwijderen?</h2>
+        </div>
+        <p className="text-sm text-gray-600 mb-5">
+          <span className="font-medium">{overleg.titel}</span> wordt gearchiveerd en verdwijnt uit de lijst.
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Annuleren
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50"
+          >
+            {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            Verwijderen
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+// ── Context menu ──────────────────────────────────────────────────────────────
+
+interface OverlegMenuProps {
+  overleg: Overleg
+  onEdit: () => void
+  onDelete: () => void
+}
+
+function OverlegMenu({ overleg: _overleg, onEdit, onDelete }: OverlegMenuProps) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+        aria-label="Opties"
+      >
+        <MoreVertical size={15} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -4 }}
+            transition={{ duration: 0.1 }}
+            className="absolute right-0 top-8 z-20 bg-white border border-gray-200 rounded-xl shadow-lg min-w-[140px] py-1 overflow-hidden"
+          >
+            <button
+              onClick={() => { setOpen(false); onEdit() }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <Pencil size={13} className="text-gray-400" /> Bewerken
+            </button>
+            <button
+              onClick={() => { setOpen(false); onDelete() }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <Trash2 size={13} className="text-red-400" /> Verwijderen
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
+
 export function OverleggenPage({
   currentUserId: _currentUserId,
   currentProfile: _currentProfile,
@@ -88,7 +386,6 @@ export function OverleggenPage({
   const supabase = createClient()
   const now = new Date().toISOString()
 
-  // DB overleggen (future only)
   const [overleggen, setOverleggen] = useState<Overleg[]>(
     initialOverleggen.filter((o) => !o.gearchiveerd && o.datum_tijd >= now)
       .sort((a, b) => a.datum_tijd.localeCompare(b.datum_tijd))
@@ -119,6 +416,10 @@ export function OverleggenPage({
 
   // Expanded overleg ID
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  // Edit / delete modal state
+  const [editOverleg, setEditOverleg] = useState<Overleg | null>(null)
+  const [deleteOverleg, setDeleteOverleg] = useState<Overleg | null>(null)
 
   useEffect(() => {
     const TARGET = 'DIT BESPREKEN'
@@ -157,8 +458,18 @@ export function OverleggenPage({
     return verslagen.filter((f) => f.name.toLowerCase().includes(q))
   }, [verslagen, searchQuery])
 
-  // First upcoming overleg gets Trello cards
   const firstOverlegId = overleggen[0]?.id ?? null
+
+  function handleSaved(updated: Overleg) {
+    setOverleggen((prev) =>
+      prev.map((o) => o.id === updated.id ? updated : o)
+        .sort((a, b) => a.datum_tijd.localeCompare(b.datum_tijd))
+    )
+  }
+
+  function handleDeleted(id: string) {
+    setOverleggen((prev) => prev.filter((o) => o.id !== id))
+  }
 
   return (
     <>
@@ -186,11 +497,11 @@ export function OverleggenPage({
                 return (
                   <motion.div key={overleg.id} variants={itemVariants}>
                     <Card>
-                      <button
-                        onClick={() => setExpandedId(isExpanded ? null : overleg.id)}
-                        className="w-full text-left"
-                      >
-                        <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <button
+                          onClick={() => setExpandedId(isExpanded ? null : overleg.id)}
+                          className="flex-1 text-left min-w-0"
+                        >
                           <div className="flex-1 min-w-0">
                             {/* Type badge */}
                             <div className="flex items-center gap-2 mb-1.5">
@@ -209,7 +520,6 @@ export function OverleggenPage({
                               )}
                             </div>
                             <h3 className="font-semibold text-gray-900">{overleg.titel}</h3>
-                            {/* Datum/tijd prominent */}
                             <p className="text-base font-medium text-gray-700 mt-1">
                               {formatDateTime(overleg.datum_tijd)}
                             </p>
@@ -233,7 +543,7 @@ export function OverleggenPage({
                                 </span>
                               )}
                             </div>
-                            {/* Online meeting link prominent */}
+                            {/* Online meeting link */}
                             {overleg.locatie && overleg.type_overleg === 'online' && (
                               <a
                                 href={overleg.locatie}
@@ -248,11 +558,25 @@ export function OverleggenPage({
                               </a>
                             )}
                           </div>
-                          <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                            <ChevronDown size={16} className="text-gray-400" />
-                          </motion.div>
+                        </button>
+
+                        {/* Right: menu + chevron */}
+                        <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                          <OverlegMenu
+                            overleg={overleg}
+                            onEdit={() => setEditOverleg(overleg)}
+                            onDelete={() => setDeleteOverleg(overleg)}
+                          />
+                          <button
+                            onClick={() => setExpandedId(isExpanded ? null : overleg.id)}
+                            className="p-1"
+                          >
+                            <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                              <ChevronDown size={16} className="text-gray-400" />
+                            </motion.div>
+                          </button>
                         </div>
-                      </button>
+                      </div>
 
                       <AnimatePresence>
                         {isExpanded && (
@@ -366,6 +690,24 @@ export function OverleggenPage({
           )}
         </section>
       </div>
+
+      {/* Modals */}
+      <AnimatePresence>
+        {editOverleg && (
+          <EditModal
+            overleg={editOverleg}
+            onClose={() => setEditOverleg(null)}
+            onSaved={handleSaved}
+          />
+        )}
+        {deleteOverleg && (
+          <DeleteConfirm
+            overleg={deleteOverleg}
+            onClose={() => setDeleteOverleg(null)}
+            onDeleted={handleDeleted}
+          />
+        )}
+      </AnimatePresence>
     </>
   )
 }
