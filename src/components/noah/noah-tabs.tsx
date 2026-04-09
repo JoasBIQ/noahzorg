@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Heart, Briefcase, Stethoscope, Users2, FolderOpen, ClipboardList } from 'lucide-react'
+import { Briefcase, Stethoscope, Users2, FolderOpen, ClipboardList } from 'lucide-react'
 import { motion } from 'framer-motion'
+import Image from 'next/image'
 import { Header } from '@/components/layout/header'
 import { WieIsNoahTab } from '@/components/noah/wie-is-noah-tab'
 import { PraktischTab } from '@/components/noah/praktisch-tab'
@@ -18,8 +19,12 @@ interface NoahTabsProps {
   updatedByProfile: Profile | null
 }
 
+function NoahTabIcon(_props: { size?: number; className?: string }) {
+  return <Image src="/icons/icon-192x192.png" alt="" width={16} height={16} className="flex-shrink-0" />
+}
+
 const TABS = [
-  { id: 'wie-is-noah', label: 'Wie is Noah', icon: Heart },
+  { id: 'wie-is-noah', label: 'Wie is Noah', icon: NoahTabIcon },
   { id: 'praktisch', label: 'Praktisch', icon: Briefcase },
   { id: 'medisch', label: 'Medisch', icon: Stethoscope },
   { id: 'contacten', label: 'Contacten', icon: Users2 },

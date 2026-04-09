@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Heart,
   Pencil,
   Save,
   X,
@@ -16,6 +15,7 @@ import {
   AlertTriangle,
   Pill,
 } from 'lucide-react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { logAudit } from '@/lib/audit'
 import { Button } from '@/components/ui/button'
@@ -212,7 +212,7 @@ export function NoahPage({ noahProfiel, currentProfile, updatedByProfile }: Noah
         <motion.div variants={sectionVariants} initial="hidden" animate="visible">
           <Card>
             <div className="flex items-center gap-2 mb-4">
-              <Heart size={18} className="text-primary" />
+              <Image src="/icons/icon-192x192.png" alt="" width={18} height={18} className="flex-shrink-0" />
               <h2 className="text-base font-semibold text-gray-900">Wie is Noah</h2>
             </div>
             <div className="space-y-4">

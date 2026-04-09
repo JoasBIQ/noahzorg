@@ -4,12 +4,12 @@ import {
   CheckSquare,
   Calendar,
   Users2,
-  Heart,
   UserCog,
   MessageSquare,
   Mail,
   HardDrive,
 } from 'lucide-react'
+import { NoahNavIcon } from '@/components/layout/noah-nav-icon'
 import type { LogboekCategorie, TaakPrioriteit, TaakStatus, AgendaType } from '@/types'
 
 export const USER_COLORS = [
@@ -23,7 +23,7 @@ export const USER_COLORS = [
 
 export const NAV_ITEMS = [
   { label: 'Home', href: '/', icon: Home, adminOnly: false },
-  { label: 'Noah', href: '/noah', icon: Heart, adminOnly: false },
+  { label: 'Noah', href: '/noah', icon: NoahNavIcon, adminOnly: false },
   { label: 'Notities over Noah', href: '/logboek', icon: BookOpen, adminOnly: false },
   { label: 'Agenda', href: '/agenda', icon: Calendar, adminOnly: false },
   { label: 'Taken', href: '/taken', icon: CheckSquare, adminOnly: false },

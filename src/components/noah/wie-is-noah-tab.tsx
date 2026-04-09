@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Pencil, Check, Heart, Sun } from 'lucide-react'
+import { Pencil, Check, Sun } from 'lucide-react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -129,7 +130,7 @@ export function WieIsNoahTab({ currentUserId }: WieIsNoahTabProps) {
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Heart size={18} className="text-[#C4704F]" />
+            <Image src="/icons/icon-192x192.png" alt="" width={18} height={18} className="flex-shrink-0" />
             <h2 className="text-base font-semibold text-gray-900">Over Noah</h2>
           </div>
           {editingSection !== 'over' ? (

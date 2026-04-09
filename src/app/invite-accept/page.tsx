@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Heart, Eye, EyeOff, Loader2, CheckCircle, AlertCircle, Shield } from 'lucide-react'
+import { Eye, EyeOff, Loader2, CheckCircle, AlertCircle, Shield } from 'lucide-react'
+import Image from 'next/image'
 
 type Step = 'loading' | 'form' | 'error'
 
@@ -132,8 +133,8 @@ export default function InviteAcceptPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#4A7C59]/10 mb-4">
-            <Heart className="w-8 h-8 text-[#4A7C59]" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#4A7C59]/10 mb-4 overflow-hidden">
+            <Image src="/icons/icon-192x192.png" alt="Noah's Zorg" width={56} height={56} />
           </div>
           <h1 className="text-2xl font-semibold text-gray-900">Noah&apos;s Zorg</h1>
           <p className="text-[#6B7280] text-sm mt-1">Je bent uitgenodigd om deel te nemen</p>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Heart } from 'lucide-react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -55,8 +55,8 @@ export function NamePrompt({ profileId, onComplete }: NamePromptProps) {
         className="w-full max-w-sm mx-4"
       >
         <div className="text-center mb-8">
-          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#4A7C59] mb-4">
-            <Heart className="h-7 w-7 text-white" />
+          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#4A7C59] mb-4 overflow-hidden">
+            <Image src="/icons/icon-192x192.png" alt="Noah's Zorg" width={56} height={56} />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">
             Welkom bij Noah&apos;s Zorg

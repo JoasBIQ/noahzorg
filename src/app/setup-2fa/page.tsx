@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Heart, Shield, Smartphone, Copy, CheckCircle, Loader2, ChevronRight } from 'lucide-react'
+import { Shield, Smartphone, Copy, CheckCircle, Loader2, ChevronRight } from 'lucide-react'
+import Image from 'next/image'
 
 type Step = 'loading' | 'scan' | 'confirm' | 'done'
 
@@ -97,8 +98,8 @@ export default function Setup2FAPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#4A7C59]/10 mb-4">
-            <Heart className="w-8 h-8 text-[#4A7C59]" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#4A7C59]/10 mb-4 overflow-hidden">
+            <Image src="/icons/icon-192x192.png" alt="Noah's Zorg" width={56} height={56} />
           </div>
           <h1 className="text-2xl font-semibold text-gray-900">Noah&apos;s Zorg</h1>
           <p className="text-[#6B7280] text-sm mt-1">Twee-staps verificatie instellen</p>

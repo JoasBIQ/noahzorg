@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
+import Image from 'next/image'
 import {
   Pencil,
   Check,
@@ -9,7 +10,6 @@ import {
   Plus,
   Trash2,
   Stethoscope,
-  Heart,
   Building2,
   Users,
   FileText,
@@ -429,7 +429,7 @@ export function MedischTab({ currentUserId }: MedischTabProps) {
         <Card>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Heart size={18} className="text-[#4A7C59]" />
+              <Image src="/icons/icon-192x192.png" alt="" width={18} height={18} className="flex-shrink-0" />
               <h3 className="font-semibold text-gray-900">Diagnose</h3>
             </div>
             {editDiagnose ? (
