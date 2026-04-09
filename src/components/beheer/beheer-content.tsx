@@ -1007,11 +1007,28 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   return buffer
 }
 
-function swReady(timeoutMs = 6000): Promise<ServiceWorkerRegistration> {
+async function swReady(): Promise<ServiceWorkerRegistration> {
+  // Snelle path: al een actieve registratie (herbezoek of zelfde sessie)
+  const existing = await navigator.serviceWorker.getRegistration('/')
+  if (existing?.active) return existing
+
+  // Geen actieve SW gevonden — trigger expliciet registratie als het nog niet bezig is
+  if (!existing) {
+    try {
+      await navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    } catch {
+      // SW-registratie mislukt (bijv. dev-modus of file niet gevonden)
+    }
+  }
+
+  // Wacht tot de SW actief is, max 30 seconden
   return Promise.race([
     navigator.serviceWorker.ready,
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Service worker niet beschikbaar (mogelijk dev-modus of niet ondersteund)')), timeoutMs)
+      setTimeout(
+        () => reject(new Error('Service worker kon niet worden geactiveerd. Herlaad de pagina en probeer opnieuw.')),
+        30_000
+      )
     ),
   ])
 }
@@ -1041,7 +1058,10 @@ function NotificatieSectie() {
         setFout('Toestemming geweigerd. Sta notificaties toe via de browserinstellingen.')
         return
       }
-      if (permission !== 'granted') return
+      if (permission !== 'granted') {
+        // Dialoog gesloten zonder keuze
+        return
+      }
 
       let reg: ServiceWorkerRegistration
       try {
