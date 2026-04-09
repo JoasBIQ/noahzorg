@@ -49,8 +49,8 @@ export function Sidebar() {
       <aside className="fixed left-0 top-0 z-30 flex h-screen w-64 flex-col border-r border-gray-200 bg-[#FAFAF8]">
         {/* Logo + notificatiebel */}
         <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-5">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg overflow-hidden bg-[#FAFAF8]">
-            <Image src="/icons/icon-192x192.png" alt="Noah's Zorg" width={36} height={36} />
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl overflow-hidden bg-[#FAFAF8]">
+            <Image src="/icons/icon-192x192.png" alt="Noah's Zorg" width={44} height={44} />
           </div>
           <span className="flex-1 text-lg font-semibold text-gray-900">
             Noah&apos;s Zorg
