@@ -29,13 +29,24 @@ export default async function OverleggenRoute() {
 
   const verslagenFolderId = (verslagenSetting as { value: string } | null)?.value ?? null
 
-  // Haal aankomende overleggen op
+  const now = new Date().toISOString()
+
+  // Aankomende overleggen
   const { data: overleggen } = await supabase
     .from('overleggen')
     .select('*')
     .eq('gearchiveerd', false)
-    .gte('datum_tijd', new Date().toISOString())
+    .gte('datum_tijd', now)
     .order('datum_tijd', { ascending: true })
+
+  // Verleden overleggen (meest recent eerst, max 50)
+  const { data: verledenOverleggen } = await supabase
+    .from('overleggen')
+    .select('*')
+    .eq('gearchiveerd', false)
+    .lt('datum_tijd', now)
+    .order('datum_tijd', { ascending: false })
+    .limit(50)
 
   return (
     <AppShell>
@@ -44,6 +55,7 @@ export default async function OverleggenRoute() {
         currentUserId={user.id}
         verslagenFolderId={verslagenFolderId}
         initialOverleggen={(overleggen ?? []) as Overleg[]}
+        initialVerleden={(verledenOverleggen ?? []) as Overleg[]}
       />
     </AppShell>
   )

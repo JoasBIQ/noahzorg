@@ -38,6 +38,7 @@ interface OverleggenPageProps {
   currentProfile: Profile
   verslagenFolderId: string | null
   initialOverleggen: Overleg[]
+  initialVerleden: Overleg[]
 }
 
 interface TrelloCard {
@@ -382,6 +383,7 @@ export function OverleggenPage({
   currentProfile: _currentProfile,
   verslagenFolderId,
   initialOverleggen,
+  initialVerleden,
 }: OverleggenPageProps) {
   const supabase = createClient()
   const now = new Date().toISOString()
@@ -460,15 +462,37 @@ export function OverleggenPage({
 
   const firstOverlegId = overleggen[0]?.id ?? null
 
+  // Verleden overleggen
+  const [verleden, setVerleden] = useState<Overleg[]>(
+    initialVerleden.filter((o) => !o.gearchiveerd)
+  )
+  const [verledenOpen, setVerledenOpen] = useState(false)
+  const VERLEDEN_STAP = 5
+  const [verledenZichtbaar, setVerledenZichtbaar] = useState(VERLEDEN_STAP)
+
   function handleSaved(updated: Overleg) {
-    setOverleggen((prev) =>
-      prev.map((o) => o.id === updated.id ? updated : o)
-        .sort((a, b) => a.datum_tijd.localeCompare(b.datum_tijd))
-    )
+    // Als datum nu in verleden ligt: verplaats naar verleden-lijst
+    const isPast = new Date(updated.datum_tijd) < new Date()
+    if (isPast) {
+      setOverleggen((prev) => prev.filter((o) => o.id !== updated.id))
+      setVerleden((prev) => {
+        const exists = prev.some((o) => o.id === updated.id)
+        const next = exists
+          ? prev.map((o) => o.id === updated.id ? updated : o)
+          : [updated, ...prev]
+        return next.sort((a, b) => b.datum_tijd.localeCompare(a.datum_tijd))
+      })
+    } else {
+      setOverleggen((prev) =>
+        prev.map((o) => o.id === updated.id ? updated : o)
+          .sort((a, b) => a.datum_tijd.localeCompare(b.datum_tijd))
+      )
+    }
   }
 
   function handleDeleted(id: string) {
     setOverleggen((prev) => prev.filter((o) => o.id !== id))
+    setVerleden((prev) => prev.filter((o) => o.id !== id))
   }
 
   return (
@@ -637,6 +661,100 @@ export function OverleggenPage({
             </motion.div>
           )}
         </section>
+
+        {/* Verleden */}
+        {verleden.length > 0 && (
+          <section>
+            <button
+              onClick={() => setVerledenOpen((v) => !v)}
+              className="flex items-center gap-2 mb-3 w-full text-left group"
+            >
+              <Calendar size={18} className="text-gray-400" />
+              <h2 className="text-lg font-semibold text-gray-900">Verleden</h2>
+              <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5 ml-1">{verleden.length}</span>
+              <ChevronDown
+                size={16}
+                className={`text-gray-400 ml-auto transition-transform ${verledenOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            <AnimatePresence>
+              {verledenOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-3">
+                    {verleden.slice(0, verledenZichtbaar).map((overleg) => (
+                      <motion.div key={overleg.id} variants={itemVariants}>
+                        <Card className="opacity-80">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              {/* Type badge */}
+                              <div className="flex items-center gap-2 mb-1.5">
+                                {overleg.type_overleg === 'online' ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-2 py-0.5">
+                                    <Monitor size={11} /> Online
+                                  </span>
+                                ) : overleg.type_overleg === 'telefoon' ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-100 rounded-full px-2 py-0.5">
+                                    <Phone size={11} /> Telefoon
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-[#4A7C59] bg-[#4A7C59]/10 border border-[#4A7C59]/20 rounded-full px-2 py-0.5">
+                                    <MapPin size={11} /> Fysiek
+                                  </span>
+                                )}
+                              </div>
+                              <h3 className="font-semibold text-gray-900">{overleg.titel}</h3>
+                              <p className="text-sm text-gray-500 mt-1">{formatDateTime(overleg.datum_tijd)}</p>
+                              <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-muted">
+                                {((overleg as any).aanwezigen_tekst || overleg.aanwezigen?.length > 0) && (
+                                  <span className="flex items-center gap-1">
+                                    <Users size={12} />
+                                    {(overleg as any).aanwezigen_tekst || `${overleg.aanwezigen.length} aanwezig`}
+                                  </span>
+                                )}
+                                {overleg.locatie && (
+                                  <span className="flex items-center gap-1">
+                                    {overleg.type_overleg === 'telefoon' ? <Phone size={12} /> : <MapPin size={12} />}
+                                    {overleg.locatie}
+                                  </span>
+                                )}
+                              </div>
+                              {overleg.notities && (
+                                <p className="text-xs text-gray-500 mt-2 line-clamp-2 italic">{overleg.notities}</p>
+                              )}
+                            </div>
+                            <div className="flex-shrink-0 mt-0.5">
+                              <OverlegMenu
+                                overleg={overleg}
+                                onEdit={() => setEditOverleg(overleg)}
+                                onDelete={() => setDeleteOverleg(overleg)}
+                              />
+                            </div>
+                          </div>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+
+                  {verleden.length > verledenZichtbaar && (
+                    <button
+                      onClick={() => setVerledenZichtbaar((v) => v + VERLEDEN_STAP)}
+                      className="mt-3 w-full py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      Toon meer ({verleden.length - verledenZichtbaar} resterend)
+                    </button>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </section>
+        )}
 
         {/* Verslagen */}
         <section>
