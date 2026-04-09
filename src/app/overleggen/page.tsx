@@ -39,11 +39,10 @@ export default async function OverleggenRoute() {
     .gte('datum_tijd', now)
     .order('datum_tijd', { ascending: true })
 
-  // Verleden overleggen (meest recent eerst, max 50)
+  // Verleden overleggen (meest recent eerst, max 50) — ook gearchiveerde tonen als historiek
   const { data: verledenOverleggen } = await supabase
     .from('overleggen')
     .select('*')
-    .eq('gearchiveerd', false)
     .lt('datum_tijd', now)
     .order('datum_tijd', { ascending: false })
     .limit(50)

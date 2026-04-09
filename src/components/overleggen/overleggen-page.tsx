@@ -463,9 +463,7 @@ export function OverleggenPage({
   const firstOverlegId = overleggen[0]?.id ?? null
 
   // Verleden overleggen
-  const [verleden, setVerleden] = useState<Overleg[]>(
-    initialVerleden.filter((o) => !o.gearchiveerd)
-  )
+  const [verleden, setVerleden] = useState<Overleg[]>(initialVerleden)
   const [verledenOpen, setVerledenOpen] = useState(false)
   const VERLEDEN_STAP = 5
   const [verledenZichtbaar, setVerledenZichtbaar] = useState(VERLEDEN_STAP)
