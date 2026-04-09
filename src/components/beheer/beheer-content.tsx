@@ -1008,29 +1008,39 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 }
 
 async function swReady(): Promise<ServiceWorkerRegistration> {
-  // Snelle path: al een actieve registratie (herbezoek of zelfde sessie)
+  // Snelle path: bestaande actieve registratie
   const existing = await navigator.serviceWorker.getRegistration('/')
   if (existing?.active) return existing
 
-  // Geen actieve SW gevonden — trigger expliciet registratie als het nog niet bezig is
-  if (!existing) {
-    try {
-      await navigator.serviceWorker.register('/sw.js', { scope: '/' })
-    } catch {
-      // SW-registratie mislukt (bijv. dev-modus of file niet gevonden)
-    }
+  // Registreer expliciet — next-pwa auto-registratie werkt niet altijd in App Router
+  let reg: ServiceWorkerRegistration
+  try {
+    reg = existing ?? await navigator.serviceWorker.register('/sw.js', { scope: '/' })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(`SW registratie mislukt: ${msg}`)
   }
 
-  // Wacht tot de SW actief is, max 30 seconden
-  return Promise.race([
-    navigator.serviceWorker.ready,
-    new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error('Service worker kon niet worden geactiveerd. Herlaad de pagina en probeer opnieuw.')),
-        30_000
-      )
-    ),
-  ])
+  if (reg.active) return reg
+
+  // Wacht op activering via statechange (betrouwbaarder dan serviceWorker.ready)
+  return new Promise<ServiceWorkerRegistration>((resolve, reject) => {
+    const timeout = setTimeout(
+      () => reject(new Error('SW activatie duurde te lang. Herlaad de pagina en probeer opnieuw.')),
+      20_000
+    )
+    function check() {
+      if (reg.active) { clearTimeout(timeout); resolve(reg) }
+    }
+    const sw = reg.installing ?? reg.waiting
+    if (sw) sw.addEventListener('statechange', check)
+    reg.addEventListener('updatefound', () => {
+      const n = reg.installing
+      if (n) n.addEventListener('statechange', check)
+    })
+    // Controleer ook via serviceWorker.ready als fallback
+    navigator.serviceWorker.ready.then((r) => { clearTimeout(timeout); resolve(r) })
+  })
 }
 
 function NotificatieSectie() {
@@ -1066,8 +1076,10 @@ function NotificatieSectie() {
       let reg: ServiceWorkerRegistration
       try {
         reg = await swReady()
-      } catch {
-        setFout('Service worker is niet actief. Probeer de pagina te herladen (werkt alleen in productie).')
+      } catch (swErr) {
+        const msg = swErr instanceof Error ? swErr.message : String(swErr)
+        console.error('[notificaties] swReady fout:', swErr)
+        setFout(`Service worker fout: ${msg}`)
         return
       }
 
