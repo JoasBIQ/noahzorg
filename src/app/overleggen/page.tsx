@@ -15,37 +15,21 @@ export default async function OverleggenRoute() {
     redirect('/login')
   }
 
-  const { data: currentProfile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  const { data: verslagenSetting } = await supabase
-    .from('app_instellingen')
-    .select('value')
-    .eq('key', 'drive_map_verslagen')
-    .maybeSingle()
-
-  const verslagenFolderId = (verslagenSetting as { value: string } | null)?.value ?? null
-
   const now = new Date().toISOString()
 
-  // Aankomende overleggen
-  const { data: overleggen } = await supabase
-    .from('overleggen')
-    .select('*')
-    .eq('gearchiveerd', false)
-    .gte('datum_tijd', now)
-    .order('datum_tijd', { ascending: true })
+  const [
+    { data: currentProfile },
+    { data: verslagenSetting },
+    { data: overleggen },
+    { data: verledenOverleggen },
+  ] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('app_instellingen').select('value').eq('key', 'drive_map_verslagen').maybeSingle(),
+    supabase.from('overleggen').select('*').eq('gearchiveerd', false).gte('datum_tijd', now).order('datum_tijd', { ascending: true }),
+    supabase.from('overleggen').select('*').lt('datum_tijd', now).order('datum_tijd', { ascending: false }).limit(50),
+  ])
 
-  // Verleden overleggen (meest recent eerst, max 50) — ook gearchiveerde tonen als historiek
-  const { data: verledenOverleggen } = await supabase
-    .from('overleggen')
-    .select('*')
-    .lt('datum_tijd', now)
-    .order('datum_tijd', { ascending: false })
-    .limit(50)
+  const verslagenFolderId = (verslagenSetting as { value: string } | null)?.value ?? null
 
   return (
     <AppShell>

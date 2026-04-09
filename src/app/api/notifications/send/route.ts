@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { title, body, url, tag, userId, excludeUserId } = await request.json()
+    console.log('[notifications/send] aangeroepen:', { title, body: body?.slice(0, 40), userId, excludeUserId })
 
     if (!title || !body) {
       return NextResponse.json({ error: 'title en body zijn verplicht.' }, { status: 400 })
@@ -35,7 +36,8 @@ export async function POST(request: NextRequest) {
     const payload = { title, body, url: url ?? '/', tag }
 
     if (userId) {
-      await sendPushToUser(userId, payload)
+      const ok = await sendPushToUser(userId, payload)
+      console.log('[notifications/send] sendPushToUser resultaat:', ok)
     } else {
       await sendPushToAll(payload, excludeUserId)
     }

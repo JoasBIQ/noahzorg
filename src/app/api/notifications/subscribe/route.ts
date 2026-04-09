@@ -13,14 +13,23 @@ export async function POST(request: NextRequest) {
 
     const subscription = await request.json()
     if (!subscription?.endpoint) {
+      console.error('[subscribe] Ongeldige subscription ontvangen:', subscription)
       return NextResponse.json({ error: 'Ongeldige subscription.' }, { status: 400 })
     }
 
+    console.log('[subscribe] Subscription opslaan voor user:', user.id, 'endpoint:', subscription.endpoint?.slice(0, 60))
+
     const admin = createAdminClient()
-    await admin
+    const { error } = await admin
       .from('push_subscriptions')
       .upsert({ user_id: user.id, subscription }, { onConflict: 'user_id' })
 
+    if (error) {
+      console.error('[subscribe] DB upsert fout:', error)
+      return NextResponse.json({ error: 'Opslaan mislukt: ' + error.message }, { status: 500 })
+    }
+
+    console.log('[subscribe] Subscription opgeslagen voor user:', user.id)
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('[subscribe] error:', err)

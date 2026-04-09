@@ -4,6 +4,10 @@ import { getCalendarClient, mapGoogleEvent } from '@/lib/google-calendar'
 
 export const dynamic = 'force-dynamic'
 
+// In-memory cache: key = userId+timeMin+timeMax, value = { events, ts }
+const cache = new Map<string, { events: ReturnType<typeof mapGoogleEvent>[]; ts: number }>()
+const CACHE_TTL_MS = 60_000 // 60 seconden
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient()
@@ -16,6 +20,12 @@ export async function GET(request: NextRequest) {
 
     if (!timeMin || !timeMax) {
       return NextResponse.json({ error: 'timeMin en timeMax zijn verplicht.' }, { status: 400 })
+    }
+
+    const cacheKey = `${user.id}:${timeMin}:${timeMax}`
+    const cached = cache.get(cacheKey)
+    if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+      return NextResponse.json({ events: cached.events, connected: true })
     }
 
     const calendar = await getCalendarClient()
@@ -31,6 +41,7 @@ export async function GET(request: NextRequest) {
     })
 
     const events = (res.data.items ?? []).map(mapGoogleEvent)
+    cache.set(cacheKey, { events, ts: Date.now() })
     return NextResponse.json({ events, connected: true })
   } catch (err: unknown) {
     const status = (err as { status?: number })?.status

@@ -19,22 +19,15 @@ export default async function LogboekRoute({
     redirect('/login')
   }
 
-  // Fetch all non-archived logboek entries, ordered by created_at DESC
-  const { data: entries } = await supabase
-    .from('logboek')
-    .select('*')
-    .eq('gearchiveerd', false)
-    .order('created_at', { ascending: false })
-
-  // Fetch all profiles for filter dropdown and avatar display
-  const { data: profiles } = await supabase.from('profiles').select('*')
-
-  // Fetch current user profile
-  const { data: currentProfile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const [
+    { data: entries },
+    { data: profiles },
+    { data: currentProfile },
+  ] = await Promise.all([
+    supabase.from('logboek').select('*').eq('gearchiveerd', false).order('created_at', { ascending: false }),
+    supabase.from('profiles').select('*'),
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+  ])
 
   return (
     <AppShell>

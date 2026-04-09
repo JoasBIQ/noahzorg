@@ -59,6 +59,54 @@ async function swReady(): Promise<ServiceWorkerRegistration> {
   })
 }
 
+function TestNotificatieKnop() {
+  const [bezig, setBezig] = useState(false)
+  const [resultaat, setResultaat] = useState<string | null>(null)
+
+  async function stuurTest() {
+    setBezig(true)
+    setResultaat(null)
+    try {
+      const res = await fetch('/api/notifications/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Testnotificatie',
+          body: 'Als je dit ziet werken push notificaties correct!',
+          url: '/profiel',
+          tag: 'test',
+        }),
+      })
+      if (res.ok) {
+        setResultaat('Verstuurd! Controleer of je een melding ontvangt.')
+      } else {
+        const data = await res.json()
+        setResultaat(`Fout: ${data.error ?? res.status}`)
+      }
+    } catch {
+      setResultaat('Netwerk fout bij versturen.')
+    } finally {
+      setBezig(false)
+      setTimeout(() => setResultaat(null), 8000)
+    }
+  }
+
+  return (
+    <div className="pt-2 border-t border-gray-100">
+      <button
+        onClick={stuurTest}
+        disabled={bezig}
+        className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
+      >
+        {bezig ? 'Versturen…' : 'Stuur testnotificatie'}
+      </button>
+      {resultaat && (
+        <p className="mt-2 text-xs text-gray-600">{resultaat}</p>
+      )}
+    </div>
+  )
+}
+
 function NotificatieSectie() {
   const [status, setStatus] = useState<'laden' | 'aan' | 'uit' | 'niet-ondersteund'>('laden')
   const [bezig, setBezig] = useState(false)
@@ -166,31 +214,34 @@ function NotificatieSectie() {
       )}
 
       {(status === 'aan' || status === 'uit') && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {status === 'aan' ? (
-              <><Bell size={16} className="text-[#4A7C59]" /><span className="text-sm text-gray-700">Notificaties <span className="font-medium text-[#4A7C59]">aan</span></span></>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {status === 'aan' ? (
+                <><Bell size={16} className="text-[#4A7C59]" /><span className="text-sm text-gray-700">Notificaties <span className="font-medium text-[#4A7C59]">aan</span></span></>
+              ) : (
+                <><BellOff size={16} className="text-gray-400" /><span className="text-sm text-gray-500">Notificaties <span className="font-medium">uit</span></span></>
+              )}
+            </div>
+            {status === 'uit' ? (
+              <button
+                onClick={aanzetten}
+                disabled={bezig}
+                className="px-4 py-2 text-sm font-medium bg-[#4A7C59] text-white rounded-lg hover:bg-[#3d6b4a] disabled:opacity-50 transition-colors"
+              >
+                {bezig ? 'Bezig…' : 'Zet notificaties aan'}
+              </button>
             ) : (
-              <><BellOff size={16} className="text-gray-400" /><span className="text-sm text-gray-500">Notificaties <span className="font-medium">uit</span></span></>
+              <button
+                onClick={uitzetten}
+                disabled={bezig}
+                className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
+              >
+                {bezig ? 'Bezig…' : 'Zet notificaties uit'}
+              </button>
             )}
           </div>
-          {status === 'uit' ? (
-            <button
-              onClick={aanzetten}
-              disabled={bezig}
-              className="px-4 py-2 text-sm font-medium bg-[#4A7C59] text-white rounded-lg hover:bg-[#3d6b4a] disabled:opacity-50 transition-colors"
-            >
-              {bezig ? 'Bezig…' : 'Zet notificaties aan'}
-            </button>
-          ) : (
-            <button
-              onClick={uitzetten}
-              disabled={bezig}
-              className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
-            >
-              {bezig ? 'Bezig…' : 'Zet notificaties uit'}
-            </button>
-          )}
+          {status === 'aan' && <TestNotificatieKnop />}
         </div>
       )}
     </div>

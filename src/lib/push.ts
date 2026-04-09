@@ -1,11 +1,20 @@
 import webpush from 'web-push'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT
+const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY
+
+if (!VAPID_SUBJECT || !VAPID_PUBLIC || !VAPID_PRIVATE) {
+  console.error('[push] VAPID keys ontbreken:', {
+    VAPID_SUBJECT: !!VAPID_SUBJECT,
+    VAPID_PUBLIC: !!VAPID_PUBLIC,
+    VAPID_PRIVATE: !!VAPID_PRIVATE,
+  })
+} else {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE)
+  console.log('[push] VAPID keys geladen, subject:', VAPID_SUBJECT)
+}
 
 export interface PushPayload {
   title: string
@@ -16,33 +25,43 @@ export interface PushPayload {
 
 /**
  * Stuur een push notificatie naar één specifieke gebruiker.
- * Geeft true terug als de notificatie verstuurd is, false als er geen subscription is.
  */
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload
 ): Promise<boolean> {
+  console.log('[push] sendPushToUser:', userId, payload.title)
   const admin = createAdminClient()
-  const { data } = await admin
+  const { data, error } = await admin
     .from('push_subscriptions')
     .select('subscription')
     .eq('user_id', userId)
     .maybeSingle()
 
-  if (!data?.subscription) return false
+  if (error) {
+    console.error('[push] DB fout bij ophalen subscription:', error)
+    return false
+  }
+  if (!data?.subscription) {
+    console.log('[push] Geen subscription gevonden voor user:', userId)
+    return false
+  }
 
+  console.log('[push] Subscription gevonden, versturen...')
   try {
     await webpush.sendNotification(
       data.subscription as webpush.PushSubscription,
       JSON.stringify(payload)
     )
+    console.log('[push] Notificatie verstuurd naar user:', userId)
     return true
   } catch (err: unknown) {
-    // 410 Gone = subscription is verlopen/verwijderd — opruimen
-    if ((err as { statusCode?: number }).statusCode === 410) {
+    const code = (err as { statusCode?: number }).statusCode
+    console.error('[push] sendPushToUser fout (statusCode=' + code + '):', err)
+    if (code === 410) {
+      console.log('[push] Subscription verlopen (410), opruimen voor user:', userId)
       await admin.from('push_subscriptions').delete().eq('user_id', userId)
     }
-    console.error('[push] sendPushToUser error:', err)
     return false
   }
 }
@@ -54,14 +73,24 @@ export async function sendPushToAll(
   payload: PushPayload,
   excludeUserId?: string
 ): Promise<void> {
+  console.log('[push] sendPushToAll:', payload.title, excludeUserId ? `(excl. ${excludeUserId})` : '')
   const admin = createAdminClient()
   let query = admin.from('push_subscriptions').select('user_id, subscription')
   if (excludeUserId) {
     query = query.neq('user_id', excludeUserId)
   }
-  const { data: subs } = await query
+  const { data: subs, error } = await query
 
-  if (!subs?.length) return
+  if (error) {
+    console.error('[push] DB fout bij ophalen subscriptions:', error)
+    return
+  }
+  if (!subs?.length) {
+    console.log('[push] Geen subscriptions gevonden om naar te sturen')
+    return
+  }
+
+  console.log('[push] Versturen naar', subs.length, 'subscribers')
 
   await Promise.allSettled(
     subs.map(async (row) => {
@@ -70,11 +99,13 @@ export async function sendPushToAll(
           row.subscription as webpush.PushSubscription,
           JSON.stringify(payload)
         )
+        console.log('[push] Verstuurd naar user:', row.user_id)
       } catch (err: unknown) {
-        if ((err as { statusCode?: number }).statusCode === 410) {
+        const code = (err as { statusCode?: number }).statusCode
+        console.error('[push] Fout voor user', row.user_id, '(statusCode=' + code + '):', err)
+        if (code === 410) {
           await admin.from('push_subscriptions').delete().eq('user_id', row.user_id)
         }
-        console.error('[push] sendPushToAll error for', row.user_id, err)
       }
     })
   )

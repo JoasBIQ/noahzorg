@@ -15,21 +15,15 @@ export default async function AgendaRoute() {
     redirect('/login')
   }
 
-  // Fetch all agenda items ordered by datum_tijd ASC
-  const { data: items } = await supabase
-    .from('agenda')
-    .select('*')
-    .order('datum_tijd', { ascending: true })
-
-  // Fetch all profiles for betrokkenen display
-  const { data: profiles } = await supabase.from('profiles').select('*')
-
-  // Fetch current user profile
-  const { data: currentProfile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const [
+    { data: items },
+    { data: profiles },
+    { data: currentProfile },
+  ] = await Promise.all([
+    supabase.from('agenda').select('*').order('datum_tijd', { ascending: true }),
+    supabase.from('profiles').select('*'),
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+  ])
 
   return (
     <AppShell>
