@@ -16,25 +16,19 @@ export default async function TeamRoute() {
     redirect('/login')
   }
 
-  // Fetch all profiles
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('naam', { ascending: true })
-
-  // Fetch current user profile
-  const { data: currentProfile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const adminClient = createAdminClient()
+  const [
+    { data: profiles },
+    { data: currentProfile },
+    { data: { users } },
+  ] = await Promise.all([
+    supabase.from('profiles').select('*').order('naam', { ascending: true }),
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    adminClient.auth.admin.listUsers({ perPage: 1000 }),
+  ])
 
   const profile = currentProfile as unknown as Profile
   const isBeheerder = profile?.rol === 'beheerder'
-
-  // Fetch all auth users to determine email confirmation status
-  const adminClient = createAdminClient()
-  const { data: { users } } = await adminClient.auth.admin.listUsers({ perPage: 1000 })
 
   const emailBevestigd: Record<string, boolean> = {}
   for (const u of users) {

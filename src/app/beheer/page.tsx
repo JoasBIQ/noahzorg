@@ -16,24 +16,16 @@ export default async function BeheerRoute() {
     redirect('/login')
   }
 
-  // Only beheerders may access beheer
-  const { data: profileData } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const [{ data: profileData }, { data: allProfiles }] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('profiles').select('*').order('naam', { ascending: true }),
+  ])
 
   const profile = profileData as unknown as Profile | null
 
   if (profile?.rol !== 'beheerder') {
     redirect('/')
   }
-
-  // Fetch all profiles for audit log
-  const { data: allProfiles } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('naam', { ascending: true })
 
   return (
     <AppShell>

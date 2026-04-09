@@ -25,41 +25,28 @@ export function useOngelezen(): OngelezenCounts & { refresh: () => void } {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = supabase as any
 
-    // --- Notities ---
-    const { data: gezienNotities } = await db
-      .from('user_gezien')
-      .select('item_id')
-      .eq('user_id', user.id)
-      .eq('item_type', 'notitie')
+    const [
+      { data: gezienNotities },
+      { data: alleNotities },
+      { data: gezienOverleg },
+      { data: alleOverleggen },
+    ] = await Promise.all([
+      db.from('user_gezien').select('item_id').eq('user_id', user.id).eq('item_type', 'notitie'),
+      supabase.from('logboek').select('id, auteur_id').eq('gearchiveerd', false),
+      db.from('user_gezien').select('item_id').eq('user_id', user.id).eq('item_type', 'overleg'),
+      supabase.from('overleggen').select('id, aangemaakt_door'),
+    ])
 
     const gezeienNotitieIds = new Set<string>(
       (gezienNotities ?? []).map((g: { item_id: string }) => g.item_id)
     )
-
-    const { data: alleNotities } = await supabase
-      .from('logboek')
-      .select('id, auteur_id')
-      .eq('gearchiveerd', false)
-
     const notitiesCount = (alleNotities ?? []).filter(
       (n) => n.auteur_id !== user.id && !gezeienNotitieIds.has(n.id)
     ).length
 
-    // --- Overleggen ---
-    const { data: gezienOverleg } = await db
-      .from('user_gezien')
-      .select('item_id')
-      .eq('user_id', user.id)
-      .eq('item_type', 'overleg')
-
     const gezeienOverlegIds = new Set<string>(
       (gezienOverleg ?? []).map((g: { item_id: string }) => g.item_id)
     )
-
-    const { data: alleOverleggen } = await supabase
-      .from('overleggen')
-      .select('id, aangemaakt_door')
-
     const overleggenCount = (alleOverleggen ?? []).filter(
       (o) => o.aangemaakt_door !== user.id && !gezeienOverlegIds.has(o.id)
     ).length

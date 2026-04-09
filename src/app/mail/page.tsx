@@ -20,14 +20,12 @@ export default async function MailRoute({
     redirect('/login')
   }
 
-  const { data: currentProfile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const [{ data: currentProfile }, { connected, email: gmailEmail }] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    isGmailConnected(),
+  ])
 
   const profile = currentProfile as unknown as Profile
-  const { connected, email: gmailEmail } = await isGmailConnected()
 
   return (
     <AppShell>
