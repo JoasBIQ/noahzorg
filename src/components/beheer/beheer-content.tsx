@@ -1007,9 +1007,19 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   return buffer
 }
 
+function swReady(timeoutMs = 6000): Promise<ServiceWorkerRegistration> {
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Service worker niet beschikbaar (mogelijk dev-modus of niet ondersteund)')), timeoutMs)
+    ),
+  ])
+}
+
 function NotificatieSectie() {
   const [status, setStatus] = useState<'laden' | 'aan' | 'uit' | 'niet-ondersteund'>('laden')
   const [bezig, setBezig] = useState(false)
+  const [fout, setFout] = useState<string | null>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
@@ -1024,23 +1034,48 @@ function NotificatieSectie() {
 
   async function aanzetten() {
     setBezig(true)
+    setFout(null)
     try {
       const permission = await Notification.requestPermission()
-      if (permission !== 'granted') { setBezig(false); return }
+      if (permission === 'denied') {
+        setFout('Toestemming geweigerd. Sta notificaties toe via de browserinstellingen.')
+        return
+      }
+      if (permission !== 'granted') return
 
-      const reg = await navigator.serviceWorker.ready
+      let reg: ServiceWorkerRegistration
+      try {
+        reg = await swReady()
+      } catch {
+        setFout('Service worker is niet actief. Probeer de pagina te herladen (werkt alleen in productie).')
+        return
+      }
+
+      if (!reg.pushManager) {
+        setFout('PushManager niet beschikbaar in deze browser.')
+        return
+      }
+
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      if (!vapidKey) {
+        setFout('VAPID sleutel ontbreekt. Voeg NEXT_PUBLIC_VAPID_PUBLIC_KEY toe aan de omgevingsvariabelen.')
+        return
+      }
+
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!),
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
       })
-      await fetch('/api/notifications/subscribe', {
+      const res = await fetch('/api/notifications/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sub.toJSON()),
       })
+      if (!res.ok) throw new Error(`API fout: ${res.status}`)
       setStatus('aan')
     } catch (e) {
-      console.error(e)
+      console.error('[notificaties] aanzetten fout:', e)
+      setFout(e instanceof Error ? e.message : 'Onbekende fout. Zie browser console.')
     } finally {
       setBezig(false)
     }
@@ -1048,14 +1083,16 @@ function NotificatieSectie() {
 
   async function uitzetten() {
     setBezig(true)
+    setFout(null)
     try {
-      const reg = await navigator.serviceWorker.ready
+      const reg = await swReady()
       const sub = await reg.pushManager.getSubscription()
       if (sub) await sub.unsubscribe()
       await fetch('/api/notifications/subscribe', { method: 'DELETE' })
       setStatus('uit')
     } catch (e) {
-      console.error(e)
+      console.error('[notificaties] uitzetten fout:', e)
+      setFout(e instanceof Error ? e.message : 'Uitschakelen mislukt.')
     } finally {
       setBezig(false)
     }
@@ -1067,6 +1104,10 @@ function NotificatieSectie() {
         <BellRing size={18} className="text-[#4A7C59]" />
         <h2 className="text-base font-semibold text-gray-800">Notificaties</h2>
       </div>
+
+      {fout && (
+        <p className="mb-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{fout}</p>
+      )}
 
       {status === 'laden' && (
         <p className="text-sm text-gray-400">Status laden…</p>
