@@ -1012,7 +1012,7 @@ async function swReady(): Promise<ServiceWorkerRegistration> {
   const existing = await navigator.serviceWorker.getRegistration('/')
   if (existing?.active) return existing
 
-  // Registreer expliciet — next-pwa auto-registratie werkt niet altijd in App Router
+  // Registreer expliciet
   let reg: ServiceWorkerRegistration
   try {
     reg = existing ?? await navigator.serviceWorker.register('/sw.js', { scope: '/' })
@@ -1023,23 +1023,33 @@ async function swReady(): Promise<ServiceWorkerRegistration> {
 
   if (reg.active) return reg
 
-  // Wacht op activering via statechange (betrouwbaarder dan serviceWorker.ready)
   return new Promise<ServiceWorkerRegistration>((resolve, reject) => {
     const timeout = setTimeout(
-      () => reject(new Error('SW activatie duurde te lang. Herlaad de pagina en probeer opnieuw.')),
+      () => reject(new Error(`SW niet actief na 20s. Status: installing=${!!reg.installing} waiting=${!!reg.waiting} active=${!!reg.active}`)),
       20_000
     )
-    function check() {
-      if (reg.active) { clearTimeout(timeout); resolve(reg) }
+
+    function watchSW(sw: ServiceWorker) {
+      sw.addEventListener('statechange', () => {
+        if (sw.state === 'activated') { clearTimeout(timeout); resolve(reg) }
+        if (sw.state === 'redundant') {
+          clearTimeout(timeout)
+          reject(new Error('SW installatie mislukt (redundant). Herlaad de pagina en probeer opnieuw.'))
+        }
+      })
+      // Al geactiveerd voordat listener werd toegevoegd
+      if (sw.state === 'activated') { clearTimeout(timeout); resolve(reg) }
     }
-    const sw = reg.installing ?? reg.waiting
-    if (sw) sw.addEventListener('statechange', check)
+
+    if (reg.installing) watchSW(reg.installing)
+    else if (reg.waiting) watchSW(reg.waiting)
+
     reg.addEventListener('updatefound', () => {
-      const n = reg.installing
-      if (n) n.addEventListener('statechange', check)
+      if (reg.installing) watchSW(reg.installing)
     })
-    // Controleer ook via serviceWorker.ready als fallback
-    navigator.serviceWorker.ready.then((r) => { clearTimeout(timeout); resolve(r) })
+
+    // Fallback
+    navigator.serviceWorker.ready.then((r) => { clearTimeout(timeout); resolve(r) }).catch(() => {})
   })
 }
 
