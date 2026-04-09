@@ -71,7 +71,7 @@ export function DashboardContent({
 }: DashboardContentProps) {
   const profileMap = new Map(allProfiles.map((p) => [p.id, p]))
 
-  // Google Calendar events ophalen voor de komende 7 dagen
+  // Google Calendar events ophalen voor de komende 7 dagen (Noah iCal + familieagenda)
   const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([])
   useEffect(() => {
     const now = new Date()
@@ -80,10 +80,14 @@ export function DashboardContent({
       timeMin: now.toISOString(),
       timeMax: sevenDaysFromNow.toISOString(),
     })
-    fetch(`/api/calendar/events?${params}`)
-      .then((r) => r.json())
-      .then((data) => setGoogleEvents(Array.isArray(data.events) ? data.events : []))
-      .catch(() => setGoogleEvents([]))
+    Promise.all([
+      fetch(`/api/calendar/events?${params}`).then((r) => r.json()).catch(() => ({})),
+      fetch(`/api/calendar/family-events?${params}`).then((r) => r.json()).catch(() => ({})),
+    ]).then(([noahData, familyData]) => {
+      const noahEvents: GoogleCalendarEvent[] = Array.isArray(noahData.events) ? noahData.events : []
+      const familyEvents: GoogleCalendarEvent[] = Array.isArray(familyData.events) ? familyData.events : []
+      setGoogleEvents([...noahEvents, ...familyEvents])
+    })
   }, [])
 
   // Samenvoegen Supabase + Google Calendar, gesorteerd op datum
@@ -205,8 +209,14 @@ export function DashboardContent({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-medium text-gray-900 truncate">{event.summary}</h3>
-                        <Badge className="bg-blue-50 text-blue-700 border-blue-100">
-                          Google Agenda
+                        <Badge
+                          className={
+                            event.source === 'noah'
+                              ? 'bg-orange-50 text-orange-700 border-orange-100'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                          }
+                        >
+                          {event.source === 'noah' ? "Noah's agenda" : 'Familieagenda'}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-3 mt-1.5 text-sm text-muted">
