@@ -27,7 +27,8 @@ interface AuditLogProps {
   allProfiles: Profile[]
 }
 
-const PAGE_SIZE = 500
+const PAGE_SIZE = 50
+const INITIAL_VISIBLE = 5
 
 const MODULE_COLORS: Record<string, string> = {
   notities: 'bg-blue-100 text-blue-800',
@@ -53,6 +54,7 @@ export function AuditLog({ allProfiles }: AuditLogProps) {
   const [filterGebruiker, setFilterGebruiker] = useState('alle')
   const [filterModule, setFilterModule] = useState('alle')
   const [showFilters, setShowFilters] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   const supabase = createClient()
   const profileMap = new Map(allProfiles.map((p) => [p.id, p]))
@@ -91,6 +93,7 @@ export function AuditLog({ allProfiles }: AuditLogProps) {
   }, [supabase, offset, filterGebruiker, filterModule])
 
   useEffect(() => {
+    setExpanded(false)
     fetchEntries(true)
   }, [filterGebruiker, filterModule])
 
@@ -199,7 +202,7 @@ export function AuditLog({ allProfiles }: AuditLogProps) {
         </Card>
       ) : (
         <div className="space-y-1">
-          {entries.map((entry) => {
+          {(expanded ? entries : entries.slice(0, INITIAL_VISIBLE)).map((entry) => {
             const profile = profileMap.get(entry.gebruiker_id)
             return (
               <div
@@ -233,8 +236,21 @@ export function AuditLog({ allProfiles }: AuditLogProps) {
         </div>
       )}
 
-      {/* Load more */}
-      {hasMore && (
+      {/* Toon meer / minder */}
+      {entries.length > INITIAL_VISIBLE && (
+        <div className="text-center pt-1">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1 mx-auto text-sm text-primary hover:underline"
+          >
+            {expanded ? 'Toon minder' : `Toon alle ${entries.length} activiteiten`}
+            <ChevronDown size={14} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+      )}
+
+      {/* Load more (alleen zichtbaar als uitgevouwen en er zijn nog meer) */}
+      {expanded && hasMore && (
         <div className="text-center pt-2">
           <button
             onClick={handleLoadMore}
