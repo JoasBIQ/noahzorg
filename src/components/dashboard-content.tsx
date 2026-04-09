@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
   Calendar,
@@ -30,7 +31,7 @@ import {
   CATEGORIE_LABELS,
   CATEGORIE_COLORS,
 } from '@/lib/constants'
-import type { Profile, LogEntry, AgendaItem, Overleg } from '@/types'
+import type { Profile, LogEntry, AgendaItem, Overleg, GoogleCalendarEvent } from '@/types'
 
 interface DashboardContentProps {
   profile: Profile
@@ -57,6 +58,10 @@ type ActivityItem =
   | { type: 'logboek'; entry: LogEntry; ts: string }
   | { type: 'overleg'; overleg: Overleg; ts: string }
 
+type UpcomingItem =
+  | { kind: 'supabase'; item: AgendaItem; datum: string }
+  | { kind: 'google'; event: GoogleCalendarEvent; datum: string }
+
 export function DashboardContent({
   profile,
   allProfiles,
@@ -65,6 +70,29 @@ export function DashboardContent({
   overleggen,
 }: DashboardContentProps) {
   const profileMap = new Map(allProfiles.map((p) => [p.id, p]))
+
+  // Google Calendar events ophalen voor de komende 7 dagen
+  const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([])
+  useEffect(() => {
+    const now = new Date()
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const params = new URLSearchParams({
+      timeMin: now.toISOString(),
+      timeMax: sevenDaysFromNow.toISOString(),
+    })
+    fetch(`/api/calendar/events?${params}`)
+      .then((r) => r.json())
+      .then((data) => setGoogleEvents(Array.isArray(data.events) ? data.events : []))
+      .catch(() => setGoogleEvents([]))
+  }, [])
+
+  // Samenvoegen Supabase + Google Calendar, gesorteerd op datum
+  const allUpcoming: UpcomingItem[] = [
+    ...agendaItems.map((item) => ({ kind: 'supabase' as const, item, datum: item.datum_tijd })),
+    ...googleEvents.map((event) => ({ kind: 'google' as const, event, datum: event.start })),
+  ]
+    .sort((a, b) => new Date(a.datum).getTime() - new Date(b.datum).getTime())
+    .slice(0, 5)
 
   // Merge logboek + overleggen sorted by created_at desc, show max 5
   const activityItems: ActivityItem[] = [
@@ -129,7 +157,7 @@ export function DashboardContent({
           title="Aankomende afspraken"
           href="/agenda"
         />
-        {agendaItems.length === 0 ? (
+        {allUpcoming.length === 0 ? (
           <Card>
             <EmptyState
               icon={Calendar}
@@ -139,35 +167,65 @@ export function DashboardContent({
           </Card>
         ) : (
           <div className="space-y-3">
-            {agendaItems.map((item) => (
-              <Card key={item.id}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-medium text-gray-900 truncate">
-                        {item.titel}
-                      </h3>
-                      <Badge className={AGENDA_TYPE_COLORS[item.type]}>
-                        {AGENDA_TYPE_LABELS[item.type]}
-                      </Badge>
+            {allUpcoming.map((upcoming) => {
+              if (upcoming.kind === 'supabase') {
+                const item = upcoming.item
+                return (
+                  <Card key={`sb-${item.id}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-medium text-gray-900 truncate">{item.titel}</h3>
+                          <Badge className={AGENDA_TYPE_COLORS[item.type]}>
+                            {AGENDA_TYPE_LABELS[item.type]}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1.5 text-sm text-muted">
+                          <span className="flex items-center gap-1">
+                            <Clock size={14} />
+                            {formatDate(item.datum_tijd)} om {formatTime(item.datum_tijd)}
+                          </span>
+                          {item.locatie && (
+                            <span className="flex items-center gap-1">
+                              <MapPin size={14} />
+                              {item.locatie}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 mt-1.5 text-sm text-muted">
-                      <span className="flex items-center gap-1">
-                        <Clock size={14} />
-                        {formatDate(item.datum_tijd)} om{' '}
-                        {formatTime(item.datum_tijd)}
-                      </span>
-                      {item.locatie && (
+                  </Card>
+                )
+              }
+              // Google Calendar event
+              const event = upcoming.event
+              return (
+                <Card key={`gc-${event.id}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-medium text-gray-900 truncate">{event.summary}</h3>
+                        <Badge className="bg-blue-50 text-blue-700 border-blue-100">
+                          Google Agenda
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1.5 text-sm text-muted">
                         <span className="flex items-center gap-1">
-                          <MapPin size={14} />
-                          {item.locatie}
+                          <Clock size={14} />
+                          {formatDate(event.start)} om {formatTime(event.start)}
                         </span>
-                      )}
+                        {event.location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin size={14} />
+                            {event.location}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              )
+            })}
           </div>
         )}
       </motion.div>
