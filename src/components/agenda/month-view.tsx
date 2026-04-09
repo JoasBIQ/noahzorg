@@ -149,7 +149,10 @@ export function MonthView({
                 {visibleGoogle.map((event) => (
                   <div
                     key={event.id}
-                    className="rounded-md px-1.5 py-0.5 text-[10px] truncate cursor-pointer bg-blue-200 text-blue-900 font-medium"
+                    className="rounded-md px-1.5 py-0.5 text-[10px] truncate cursor-pointer font-medium text-white"
+                    style={{
+                      backgroundColor: event.source === 'noah' ? '#C4704F' : '#4A7C59',
+                    }}
                     onClick={(e) => {
                       e.stopPropagation()
                       onSelectGoogleEvent(event)

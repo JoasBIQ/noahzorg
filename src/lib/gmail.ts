@@ -7,6 +7,7 @@ const SCOPES = [
   'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/drive.readonly',
   'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/calendar',
 ]
 const ALGORITHM = 'aes-256-gcm'
 const REFRESH_BUFFER_MS = 5 * 60 * 1000 // refresh als token binnen 5 min verloopt

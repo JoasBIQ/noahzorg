@@ -3,31 +3,36 @@
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
+// Familieagenda: zachtgroen (huisstijl), Noah's agenda: terracotta (accentkleur)
+const SOURCE_COLORS: Record<'family' | 'noah', string> = {
+  family: '#4A7C59',
+  noah: '#C4704F',
+}
+
 interface EventBlockProps {
   title: string
   time: string
   isGoogleEvent: boolean
+  googleSource?: 'family' | 'noah'
   typeColor?: string
   style: React.CSSProperties
   onClick: () => void
 }
 
-const GOOGLE_EVENT_COLOR = '#93C5FD'
-
 export function EventBlock({
   title,
   time,
   isGoogleEvent,
+  googleSource,
   typeColor,
   style,
   onClick,
 }: EventBlockProps) {
-  const borderColor = isGoogleEvent ? GOOGLE_EVENT_COLOR : typeColor || '#6B7280'
-  const bgColor = isGoogleEvent
-    ? 'rgba(147, 197, 253, 0.2)'
-    : typeColor
-      ? `${typeColor}26`
-      : 'rgba(107, 114, 128, 0.15)'
+  const color = isGoogleEvent
+    ? SOURCE_COLORS[googleSource ?? 'family']
+    : typeColor || '#6B7280'
+
+  const bgColor = `${color}26`
 
   return (
     <motion.div
@@ -38,7 +43,7 @@ export function EventBlock({
       )}
       style={{
         ...style,
-        borderLeft: `3px solid ${borderColor}`,
+        borderLeft: `3px solid ${color}`,
         backgroundColor: bgColor,
       }}
       onClick={onClick}

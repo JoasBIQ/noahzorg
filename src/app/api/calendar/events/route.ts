@@ -39,6 +39,7 @@ async function fetchICalEvents(icalUrl: string): Promise<GoogleCalendarEvent[]> 
       description: event.description || undefined,
       htmlLink: '',
       isGoogleEvent: true as const,
+      source: 'noah' as const,
     }
   })
 

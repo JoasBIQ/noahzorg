@@ -40,6 +40,9 @@ export interface GoogleCalendarEvent {
   description?: string
   htmlLink: string
   isGoogleEvent: true
+  /** 'family' = familieagenda (schrijfbaar), 'noah' = Noah's persoonlijke iCal (alleen-lezen) */
+  source: 'family' | 'noah'
+  aangemaakt_door?: string
 }
 
 export type CalendarDisplayItem =

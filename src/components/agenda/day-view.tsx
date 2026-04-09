@@ -150,6 +150,7 @@ export function DayView({
               title={event.summary}
               time={format(new Date(event.start), 'HH:mm', { locale: nl }) + (event.end ? ` - ${format(new Date(event.end), 'HH:mm', { locale: nl })}` : '')}
               isGoogleEvent={true}
+              googleSource={event.source}
               style={{
                 position: 'absolute',
                 top: getTopPosition(event.start),

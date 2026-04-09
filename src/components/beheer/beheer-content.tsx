@@ -30,6 +30,7 @@ export function BeheerContent({ currentUserId, allProfiles }: BeheerContentProps
   const [gmailConnected, setGmailConnected] = useState(false)
   const [gmailEmail, setGmailEmail] = useState<string | null>(null)
   const [loadingGmail, setLoadingGmail] = useState(true)
+  const [calendarConnected, setCalendarConnected] = useState<boolean | null>(null)
   const [disconnectingGmail, setDisconnectingGmail] = useState(false)
   const [gmailBanner, setGmailBanner] = useState<'connected' | 'error' | null>(
     gmailParam === 'connected' ? 'connected' : gmailParam === 'error' ? 'error' : null
@@ -246,6 +247,13 @@ export function BeheerContent({ currentUserId, allProfiles }: BeheerContentProps
       }
     }
     fetchGmailStatus()
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/calendar/status')
+      .then((r) => r.json())
+      .then((data) => setCalendarConnected(data.connected === true))
+      .catch(() => setCalendarConnected(false))
   }, [])
 
   const handleGmailDisconnect = async () => {
@@ -633,25 +641,43 @@ export function BeheerContent({ currentUserId, allProfiles }: BeheerContentProps
             <h2 className="text-base font-semibold text-gray-900">Google Agenda</h2>
           </div>
           <div className="flex items-center gap-2 mb-3">
-            <span className="h-2 w-2 rounded-full bg-gray-300" />
-            <span className="text-sm text-[#6B7280]">Nog niet gekoppeld</span>
+            {calendarConnected === null ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-gray-300 animate-pulse" />
+                <span className="text-sm text-[#6B7280]">Status ophalen…</span>
+              </>
+            ) : calendarConnected ? (
+              <>
+                <span className="h-2 w-2 rounded-full bg-green-500" />
+                <span className="text-sm text-green-700 font-medium">Verbonden via Gmail-account</span>
+              </>
+            ) : (
+              <>
+                <span className="h-2 w-2 rounded-full bg-amber-400" />
+                <span className="text-sm text-amber-700">Niet verbonden — herauthoriseer Gmail</span>
+              </>
+            )}
           </div>
-          <p className="text-sm text-[#6B7280] mb-4">
-            Koppeling wordt geactiveerd zodra het Google-account van Noah beschikbaar is. Zodra je de
-            Google Calendar OAuth-credentials hebt ingesteld in de omgevingsvariabelen, verschijnt hier
-            de koppelknop.
-          </p>
-          <button
-            disabled
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-400 rounded-xl text-sm font-medium cursor-not-allowed"
-          >
-            <Calendar size={14} />
-            Koppel Google Agenda
-          </button>
-          <p className="mt-3 text-xs text-[#6B7280]">
-            Vereist: <code className="bg-gray-100 px-1 rounded">GOOGLE_CALENDAR_CLIENT_ID</code>,{' '}
-            <code className="bg-gray-100 px-1 rounded">GOOGLE_CALENDAR_CLIENT_SECRET</code> in .env.local
-          </p>
+          {calendarConnected === false && (
+            <p className="text-sm text-[#6B7280] mb-4">
+              De familieagenda gebruikt de Gmail-OAuth-verbinding. Koppel Gmail opnieuw om de kalendertoegang te activeren.
+              Zorg dat de scope <code className="bg-gray-100 px-1 rounded text-xs">calendar</code> is toegevoegd in de Google Cloud Console.
+            </p>
+          )}
+          {calendarConnected === true && (
+            <p className="text-sm text-[#6B7280] mb-2">
+              Afspraken kunnen worden aangemaakt, bewerkt en verwijderd via de Agenda-pagina. Wijzigingen zijn direct zichtbaar in Google Calendar.
+            </p>
+          )}
+          {!calendarConnected && (
+            <a
+              href="/api/gmail/auth"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#4A7C59] text-white rounded-xl text-sm font-medium hover:bg-[#3d6b4a] transition-colors"
+            >
+              <RefreshCw size={14} />
+              Herauthoriseer Gmail (incl. agenda)
+            </a>
+          )}
         </Card>
       </motion.div>
 

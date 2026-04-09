@@ -6,6 +6,8 @@ import type { GoogleCalendarEvent } from '@/types'
 export function useGoogleCalendarEvents(startDate: Date, endDate: Date) {
   const [events, setEvents] = useState<GoogleCalendarEvent[]>([])
   const [loading, setLoading] = useState(false)
+  const [familyConnected, setFamilyConnected] = useState<boolean | null>(null)
+  const [refreshTick, setRefreshTick] = useState(0)
 
   useEffect(() => {
     const timeMin = startDate.toISOString()
@@ -13,22 +15,30 @@ export function useGoogleCalendarEvents(startDate: Date, endDate: Date) {
 
     let cancelled = false
 
-    async function fetchEvents() {
+    async function fetchAll() {
       setLoading(true)
       try {
         const params = new URLSearchParams({ timeMin, timeMax })
-        const response = await fetch(`/api/calendar/events?${params}`)
 
-        if (!response.ok) {
-          setEvents([])
-          return
-        }
+        const [noahResult, familyResult] = await Promise.allSettled([
+          fetch(`/api/calendar/events?${params}`).then((r) => r.json()),
+          fetch(`/api/calendar/family-events?${params}`).then((r) => r.json()),
+        ])
 
-        const data = await response.json()
+        if (cancelled) return
 
-        if (!cancelled) {
-          setEvents(Array.isArray(data.events) ? data.events : [])
-        }
+        const noahEvents: GoogleCalendarEvent[] =
+          noahResult.status === 'fulfilled'
+            ? (noahResult.value.events ?? [])
+            : []
+
+        const familyData =
+          familyResult.status === 'fulfilled'
+            ? familyResult.value
+            : { events: [], connected: false }
+
+        setFamilyConnected(familyData.connected ?? false)
+        setEvents([...noahEvents, ...(familyData.events ?? [])])
       } catch {
         if (!cancelled) {
           setEvents([])
@@ -40,12 +50,17 @@ export function useGoogleCalendarEvents(startDate: Date, endDate: Date) {
       }
     }
 
-    fetchEvents()
+    fetchAll()
 
     return () => {
       cancelled = true
     }
-  }, [startDate.toISOString(), endDate.toISOString()])
+  }, [startDate.toISOString(), endDate.toISOString(), refreshTick])
 
-  return { events, loading }
+  return {
+    events,
+    loading,
+    familyConnected,
+    refreshFamilyEvents: () => setRefreshTick((t) => t + 1),
+  }
 }
