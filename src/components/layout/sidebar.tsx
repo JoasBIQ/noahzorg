@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Heart, LogOut, AlertTriangle, User } from 'lucide-react'
+import { LogOut, AlertTriangle, User } from 'lucide-react'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { NAV_ITEMS } from '@/lib/constants'
 import { cn, getInitials } from '@/lib/utils'
@@ -48,8 +49,8 @@ export function Sidebar() {
       <aside className="fixed left-0 top-0 z-30 flex h-screen w-64 flex-col border-r border-gray-200 bg-[#FAFAF8]">
         {/* Logo + notificatiebel */}
         <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-5">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#4A7C59]">
-            <Heart className="h-5 w-5 text-white" />
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg overflow-hidden bg-[#FAFAF8]">
+            <Image src="/icons/icon-192x192.png" alt="Noah's Zorg" width={36} height={36} />
           </div>
           <span className="flex-1 text-lg font-semibold text-gray-900">
             Noah&apos;s Zorg
