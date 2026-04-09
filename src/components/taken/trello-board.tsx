@@ -8,7 +8,7 @@ import { StrictModeDroppable } from '@/components/ui/strict-mode-droppable'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
-import { format, isPast, formatDistanceToNow } from 'date-fns'
+import { format, isPast, formatDistanceToNow, differenceInDays } from 'date-fns'
 import { nl } from 'date-fns/locale'
 
 interface TrelloBoardProps {
@@ -109,6 +109,15 @@ function MemberAvatar({ member }: { member: TrelloMember }) {
   )
 }
 
+function getDueDateStyle(due: string | null): { color: string; label?: string } {
+  if (!due) return { color: '' }
+  const dueDate = new Date(due)
+  if (isPast(dueDate)) return { color: 'text-red-600 font-medium', label: ' (verlopen)' }
+  const daysUntil = differenceInDays(dueDate, new Date())
+  if (daysUntil <= 3) return { color: 'text-orange-500 font-medium' }
+  return { color: 'text-[#6B7280]' }
+}
+
 function TrelloCardItem({
   card,
   onClick,
@@ -116,7 +125,7 @@ function TrelloCardItem({
   card: TrelloCard
   onClick: () => void
 }) {
-  const isOverdue = card.due ? isPast(new Date(card.due)) : false
+  const dueStyle = getDueDateStyle(card.due)
 
   return (
     <div
@@ -144,13 +153,10 @@ function TrelloCardItem({
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-2">
           {card.due && (
-            <span
-              className={`flex items-center gap-1 text-xs ${
-                isOverdue ? 'text-[#C4704F] font-medium' : 'text-[#6B7280]'
-              }`}
-            >
+            <span className={`flex items-center gap-1 text-xs ${dueStyle.color}`}>
               <Clock size={12} />
               {format(new Date(card.due), 'd MMM', { locale: nl })}
+              {dueStyle.label}
             </span>
           )}
         </div>
@@ -298,15 +304,17 @@ function CardDetailModal({
   open,
   onClose,
   onUrgentieChanged,
-  archieefListId,
   onArchived,
+  onDueChanged,
+  isBeheerder,
 }: {
   card: TrelloCard | null
   open: boolean
   onClose: () => void
   onUrgentieChanged?: (cardId: string, urgentie: string) => void
-  archieefListId?: string | null
   onArchived?: (cardId: string) => void
+  onDueChanged?: (cardId: string, due: string | null) => void
+  isBeheerder?: boolean
 }) {
   const [comments, setComments] = useState<TrelloComment[]>([])
   const [loadingComments, setLoadingComments] = useState(false)
@@ -315,9 +323,19 @@ function CardDetailModal({
   const [urgentie, setUrgentie] = useState('')
   const [savingUrgentie, setSavingUrgentie] = useState(false)
   const [archiving, setArchiving] = useState(false)
+  const [dueEdit, setDueEdit] = useState('')
+  const [savingDue, setSavingDue] = useState(false)
 
   useEffect(() => {
     setUrgentie(getCurrentUrgentie(card))
+    // Zet due date input: datetime-local verwacht "YYYY-MM-DDTHH:mm"
+    if (card?.due) {
+      const d = new Date(card.due)
+      const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+      setDueEdit(local.toISOString().slice(0, 16))
+    } else {
+      setDueEdit('')
+    }
   }, [card])
 
   const handleUrgentieChange = async (newUrgentie: string) => {
@@ -338,14 +356,31 @@ function CardDetailModal({
     }
   }
 
+  const handleSaveDue = async (dueValue: string | null) => {
+    if (!card || savingDue) return
+    setSavingDue(true)
+    try {
+      await fetch('/api/trello/card', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId: card.id, due: dueValue }),
+      })
+      onDueChanged?.(card.id, dueValue)
+    } catch (err) {
+      console.error('Datum opslaan mislukt:', err)
+    } finally {
+      setSavingDue(false)
+    }
+  }
+
   const handleArchive = async () => {
-    if (!card || !archieefListId || archiving) return
+    if (!card || archiving) return
     setArchiving(true)
     try {
       const res = await fetch('/api/trello/card', {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: card.id, idList: archieefListId }),
+        body: JSON.stringify({ cardId: card.id, closed: 'true' }),
       })
       if (res.ok) {
         onArchived?.(card.id)
@@ -415,8 +450,6 @@ function CardDetailModal({
 
   if (!card) return null
 
-  const isOverdue = card.due ? isPast(new Date(card.due)) : false
-
   return (
     <Modal open={open} onClose={onClose} title={card.name}>
       <div className="space-y-4">
@@ -456,20 +489,37 @@ function CardDetailModal({
           </div>
         )}
 
-        {card.due && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">Deadline</h3>
-            <span
-              className={`flex items-center gap-1.5 text-sm ${
-                isOverdue ? 'text-[#C4704F] font-medium' : 'text-[#6B7280]'
-              }`}
+        {/* Deadline — bewerkbaar */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Deadline</h3>
+          <div className="flex items-center gap-2">
+            <input
+              type="datetime-local"
+              value={dueEdit}
+              onChange={(e) => setDueEdit(e.target.value)}
+              className="flex-1 text-sm rounded-lg border border-gray-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59] bg-white text-gray-700"
+            />
+            <button
+              onClick={() => {
+                if (dueEdit) handleSaveDue(new Date(dueEdit).toISOString())
+              }}
+              disabled={savingDue || !dueEdit}
+              className="px-3 py-1.5 text-xs font-medium bg-[#4A7C59] text-white rounded-lg hover:bg-[#3d6a4a] disabled:opacity-40 transition-colors"
             >
-              <Clock size={14} />
-              {format(new Date(card.due), 'd MMMM yyyy, HH:mm', { locale: nl })}
-              {isOverdue && ' (verlopen)'}
-            </span>
+              {savingDue ? '…' : 'Opslaan'}
+            </button>
+            {card.due && (
+              <button
+                onClick={() => { setDueEdit(''); handleSaveDue(null) }}
+                disabled={savingDue}
+                className="p-1.5 text-[#6B7280] hover:text-red-500 transition-colors disabled:opacity-40"
+                title="Datum verwijderen"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
-        )}
+        </div>
 
         {card.members && card.members.length > 0 && (
           <div>
@@ -549,7 +599,7 @@ function CardDetailModal({
             Openen in Trello
           </a>
 
-          {archieefListId && (
+          {isBeheerder && (
             <button
               onClick={handleArchive}
               disabled={archiving}
@@ -977,7 +1027,7 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: Tr
         card={selectedCard}
         open={!!selectedCard}
         onClose={() => setSelectedCard(null)}
-        archieefListId={lists.find((l) => l.name.toLowerCase() === 'archief')?.id ?? null}
+        isBeheerder={isBeheerder}
         onArchived={(cardId) => {
           setLists((prev) =>
             prev.map((list) => ({
@@ -986,6 +1036,15 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: Tr
             }))
           )
           setSelectedCard(null)
+        }}
+        onDueChanged={(cardId, due) => {
+          setLists((prev) =>
+            prev.map((list) => ({
+              ...list,
+              cards: list.cards.map((c) => c.id === cardId ? { ...c, due } : c),
+            }))
+          )
+          setSelectedCard((prev) => prev?.id === cardId ? { ...prev, due } : prev)
         }}
         onUrgentieChanged={(cardId, newUrgentie) => {
           const URGENTIE_LABEL_MAP: Record<string, { color: string; naam: string }> = {

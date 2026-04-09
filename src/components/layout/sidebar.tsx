@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Heart, LogOut, AlertTriangle } from 'lucide-react'
+import { Heart, LogOut, AlertTriangle, User } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { NAV_ITEMS } from '@/lib/constants'
 import { cn, getInitials } from '@/lib/utils'
@@ -111,6 +111,21 @@ export function Sidebar() {
 
         {/* Noodinformatie knop + user + logout */}
         <div className="px-3 pb-4">
+          <Link href="/profiel">
+            <motion.div
+              whileTap={{ scale: 0.95 }}
+              className={cn(
+                'mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                pathname === '/profiel'
+                  ? 'bg-[#4A7C59]/10 text-[#4A7C59]'
+                  : 'text-[#6B7280] hover:bg-gray-100 hover:text-gray-900'
+              )}
+            >
+              <User className="h-5 w-5 flex-shrink-0" />
+              <span>Mijn profiel</span>
+            </motion.div>
+          </Link>
+
           <button
             onClick={() => setNoodOpen(true)}
             className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 active:bg-red-800"

@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, User } from 'lucide-react'
+import Link from 'next/link'
 import { Sidebar } from './sidebar'
 import { MobileNav } from './mobile-nav'
 import { NotificationBell } from './notification-bell'
@@ -62,7 +63,10 @@ export function AppShell({ children }: AppShellProps) {
         {/* Mobiele topbar: notificatiebel + noodknop */}
         <div className="lg:hidden px-4 pt-3 pb-1 space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-gray-700">Noah&apos;s Zorg</span>
+            <Link href="/profiel" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors">
+              <User size={20} />
+            </Link>
+            <span className="flex-1 text-center text-sm font-semibold text-gray-700">Noah&apos;s Zorg</span>
             <NotificationBell />
           </div>
           <button
