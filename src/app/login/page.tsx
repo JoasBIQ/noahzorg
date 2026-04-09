@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { Heart } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -36,8 +36,14 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4 bg-background">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4">
-            <Heart className="w-8 h-8 text-primary" />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/5 mb-4 overflow-hidden">
+            <Image
+              src="/icons/icon-192x192.png"
+              alt="Noah's Zorg"
+              width={80}
+              height={80}
+              priority
+            />
           </div>
           <h1 className="text-2xl font-semibold text-gray-900">Noah&apos;s Zorg</h1>
           <p className="text-muted mt-1">Samen zorgen we voor Noah</p>
