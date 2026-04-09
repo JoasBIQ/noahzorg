@@ -52,6 +52,19 @@ export function LogForm({
       return
     }
 
+    // Push notificatie naar alle andere gebruikers
+    fetch('/api/notifications/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: `Nieuwe notitie van ${currentProfile.naam}`,
+        body: bericht.trim().slice(0, 80),
+        url: '/logboek',
+        tag: 'logboek-nieuw',
+        excludeUserId: currentUserId,
+      }),
+    }).catch(() => {})
+
     setSubmitting(false)
     logAudit({
       gebruikerId: currentUserId,

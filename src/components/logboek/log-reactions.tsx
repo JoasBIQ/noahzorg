@@ -52,6 +52,19 @@ export function LogReactions({
       .update({ reacties: updatedReacties })
       .eq('id', logboekId)
 
+    // Push notificatie naar alle andere gebruikers
+    fetch('/api/notifications/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: `Reactie van ${currentProfile.naam}`,
+        body: bericht.trim().slice(0, 80),
+        url: '/logboek',
+        tag: 'logboek-reactie',
+        excludeUserId: currentUserId,
+      }),
+    }).catch(() => {})
+
     setBericht('')
     setSubmitting(false)
     onUpdate()

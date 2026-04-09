@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getAuthorizedClient, GmailTokenExpiredError } from '@/lib/gmail'
+import { sendPushToAll } from '@/lib/push'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,6 +64,14 @@ export async function POST(request: NextRequest) {
         ...(threadId ? { threadId } : {}),
       },
     })
+
+    // Notificeer andere gebruikers dat er een mail verstuurd is
+    sendPushToAll({
+      title: `Mail verstuurd naar ${aan}`,
+      body: onderwerp ?? '(geen onderwerp)',
+      url: '/mail',
+      tag: 'mail-verstuurd',
+    }, user.id).catch(() => {})
 
     return NextResponse.json({ success: true })
   } catch (error) {

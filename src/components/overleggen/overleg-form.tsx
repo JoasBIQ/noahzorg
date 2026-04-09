@@ -77,6 +77,20 @@ export function OverlegForm({
 
       if (insertError) throw insertError
 
+      // Push notificatie naar alle gebruikers
+      const eersteBepreekpunt = bespreekpuntenText.split('\n').find(l => l.trim())
+      fetch('/api/notifications/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Familieoverleg gepland',
+          body: `${new Date(datumTijd).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}${eersteBepreekpunt ? ` · ${eersteBepreekpunt.trim().slice(0, 60)}` : ''}`,
+          url: '/overleggen',
+          tag: 'overleg-nieuw',
+          excludeUserId: currentUserId,
+        }),
+      }).catch(() => {})
+
       logAudit({
         gebruikerId: currentUserId,
         actie: 'aangemaakt',

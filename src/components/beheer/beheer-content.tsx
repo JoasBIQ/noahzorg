@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Save, ExternalLink, Settings, CheckCircle, Calendar, Archive, RotateCcw, Mail, X, HardDrive, FolderPlus, Loader2, FolderOpen, ShieldCheck, ShieldOff, RefreshCw } from 'lucide-react'
+import { Save, ExternalLink, Settings, CheckCircle, Calendar, Archive, RotateCcw, Mail, X, HardDrive, FolderPlus, Loader2, FolderOpen, ShieldCheck, ShieldOff, RefreshCw, Bell, BellOff, BellRing } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -851,6 +851,15 @@ export function BeheerContent({ currentUserId, allProfiles }: BeheerContentProps
         <AuditLog allProfiles={allProfiles} />
       </motion.div>
 
+      {/* Notificaties */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.32 }}
+      >
+        <NotificatieSectie />
+      </motion.div>
+
       {/* Archief */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -986,3 +995,115 @@ function DriveRootFolderSetting({ currentUserId }: { currentUserId: string }) {
   )
 }
 
+function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = atob(base64)
+  const buffer = new ArrayBuffer(rawData.length)
+  const view = new Uint8Array(buffer)
+  for (let i = 0; i < rawData.length; i++) {
+    view[i] = rawData.charCodeAt(i)
+  }
+  return buffer
+}
+
+function NotificatieSectie() {
+  const [status, setStatus] = useState<'laden' | 'aan' | 'uit' | 'niet-ondersteund'>('laden')
+  const [bezig, setBezig] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator)) {
+      setStatus('niet-ondersteund')
+      return
+    }
+    fetch('/api/notifications/subscribe')
+      .then((r) => r.json())
+      .then((d) => setStatus(d.actief ? 'aan' : 'uit'))
+      .catch(() => setStatus('uit'))
+  }, [])
+
+  async function aanzetten() {
+    setBezig(true)
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') { setBezig(false); return }
+
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!),
+      })
+      await fetch('/api/notifications/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub.toJSON()),
+      })
+      setStatus('aan')
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setBezig(false)
+    }
+  }
+
+  async function uitzetten() {
+    setBezig(true)
+    try {
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.getSubscription()
+      if (sub) await sub.unsubscribe()
+      await fetch('/api/notifications/subscribe', { method: 'DELETE' })
+      setStatus('uit')
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setBezig(false)
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <BellRing size={18} className="text-[#4A7C59]" />
+        <h2 className="text-base font-semibold text-gray-800">Notificaties</h2>
+      </div>
+
+      {status === 'laden' && (
+        <p className="text-sm text-gray-400">Status laden…</p>
+      )}
+
+      {status === 'niet-ondersteund' && (
+        <p className="text-sm text-gray-500">Push notificaties worden niet ondersteund door deze browser.</p>
+      )}
+
+      {(status === 'aan' || status === 'uit') && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {status === 'aan' ? (
+              <><Bell size={16} className="text-[#4A7C59]" /><span className="text-sm text-gray-700">Notificaties <span className="font-medium text-[#4A7C59]">aan</span></span></>
+            ) : (
+              <><BellOff size={16} className="text-gray-400" /><span className="text-sm text-gray-500">Notificaties <span className="font-medium">uit</span></span></>
+            )}
+          </div>
+          {status === 'uit' ? (
+            <button
+              onClick={aanzetten}
+              disabled={bezig}
+              className="px-4 py-2 text-sm font-medium bg-[#4A7C59] text-white rounded-lg hover:bg-[#3d6b4a] disabled:opacity-50 transition-colors"
+            >
+              {bezig ? 'Bezig…' : 'Zet notificaties aan'}
+            </button>
+          ) : (
+            <button
+              onClick={uitzetten}
+              disabled={bezig}
+              className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
+            >
+              {bezig ? 'Bezig…' : 'Zet notificaties uit'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
