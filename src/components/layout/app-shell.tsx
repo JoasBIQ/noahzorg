@@ -50,24 +50,27 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="min-h-screen bg-[#FAFAF8]">
-      {/* Noodinformatie modal — beheerd door sidebar op desktop */}
       <NoodinformatieModal open={noodOpen} onClose={() => setNoodOpen(false)} />
 
-      {/* Desktop sidebar (bevat eigen noodinformatie knop) */}
+      {/* Desktop sidebar */}
       <div className="hidden lg:block">
         <Sidebar />
       </div>
 
+      {/* Notificatiebel — fixed rechtsboven, zowel desktop als mobiel */}
+      <div className="fixed top-4 right-4 z-40">
+        <NotificationBell />
+      </div>
+
       {/* Main content */}
       <main className="pb-20 lg:pl-64 lg:pb-0">
-        {/* Mobiele topbar: notificatiebel + noodknop */}
+        {/* Mobiele topbar */}
         <div className="lg:hidden px-4 pt-3 pb-1 space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 pr-10">
             <Link href="/profiel" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors">
               <User size={20} />
             </Link>
-            <span className="flex-1 text-center text-sm font-semibold text-gray-700">Noah&apos;s Zorg</span>
-            <NotificationBell />
+            <span className="text-sm font-semibold text-gray-700">Noah&apos;s Zorg</span>
           </div>
           <button
             onClick={() => setNoodOpen(true)}

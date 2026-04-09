@@ -13,7 +13,6 @@ import { useMailCounts } from '@/hooks/use-mail-counts'
 import { useOngelezen } from '@/hooks/use-ongelezen'
 import { createClient } from '@/lib/supabase/client'
 import { NoodinformatieModal } from '@/components/noah/noodinformatie-modal'
-import { NotificationBell } from '@/components/layout/notification-bell'
 
 function NavBadge({ count, color = 'bg-[#DC2626]' }: { count: number; color?: string }) {
   if (count <= 0) return null
@@ -47,7 +46,7 @@ export function Sidebar() {
       <NoodinformatieModal open={noodOpen} onClose={() => setNoodOpen(false)} />
 
       <aside className="fixed left-0 top-0 z-30 flex h-screen w-64 flex-col border-r border-gray-200 bg-[#FAFAF8]">
-        {/* Logo + notificatiebel */}
+        {/* Logo */}
         <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-5">
           <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl overflow-hidden bg-[#FAFAF8]">
             <Image src="/icons/icon-192x192.png" alt="Noah's Zorg" width={44} height={44} />
@@ -55,7 +54,6 @@ export function Sidebar() {
           <span className="flex-1 text-lg font-semibold text-gray-900">
             Noah&apos;s Zorg
           </span>
-          <NotificationBell />
         </div>
 
         {/* Navigation */}
