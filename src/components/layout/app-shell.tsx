@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { Sidebar } from './sidebar'
 import { MobileNav } from './mobile-nav'
+import { NotificationBell } from './notification-bell'
 import { NamePrompt } from '@/components/onboarding/name-prompt'
 import { NoodinformatieModal } from '@/components/noah/noodinformatie-modal'
 import { useProfile } from '@/hooks/use-profile'
@@ -58,8 +59,12 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Main content */}
       <main className="pb-20 lg:pl-64 lg:pb-0">
-        {/* Mobiele noodknop — in de flow, bovenaan de pagina, alleen op mobiel */}
-        <div className="lg:hidden px-4 pt-3 pb-1">
+        {/* Mobiele topbar: notificatiebel + noodknop */}
+        <div className="lg:hidden px-4 pt-3 pb-1 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-gray-700">Noah&apos;s Zorg</span>
+            <NotificationBell />
+          </div>
           <button
             onClick={() => setNoodOpen(true)}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 active:bg-red-800 shadow-sm"

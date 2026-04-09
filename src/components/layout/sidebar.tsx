@@ -9,14 +9,26 @@ import { NAV_ITEMS } from '@/lib/constants'
 import { cn, getInitials } from '@/lib/utils'
 import { useProfile } from '@/hooks/use-profile'
 import { useMailCounts } from '@/hooks/use-mail-counts'
+import { useOngelezen } from '@/hooks/use-ongelezen'
 import { createClient } from '@/lib/supabase/client'
 import { NoodinformatieModal } from '@/components/noah/noodinformatie-modal'
+import { NotificationBell } from '@/components/layout/notification-bell'
+
+function NavBadge({ count, color = 'bg-[#DC2626]' }: { count: number; color?: string }) {
+  if (count <= 0) return null
+  return (
+    <span className={`flex h-5 min-w-[20px] items-center justify-center rounded-full ${color} px-1.5 text-[10px] font-semibold text-white`}>
+      {count > 99 ? '99+' : count}
+    </span>
+  )
+}
 
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { profile } = useProfile()
   const mailCounts = useMailCounts()
+  const ongelezen = useOngelezen()
   const [noodOpen, setNoodOpen] = useState(false)
 
   const filteredItems = NAV_ITEMS.filter(
@@ -34,14 +46,15 @@ export function Sidebar() {
       <NoodinformatieModal open={noodOpen} onClose={() => setNoodOpen(false)} />
 
       <aside className="fixed left-0 top-0 z-30 flex h-screen w-64 flex-col border-r border-gray-200 bg-[#FAFAF8]">
-        {/* Logo */}
-        <div className="flex items-center gap-3 border-b border-gray-200 px-6 py-5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#4A7C59]">
+        {/* Logo + notificatiebel */}
+        <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-5">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#4A7C59]">
             <Heart className="h-5 w-5 text-white" />
           </div>
-          <span className="text-lg font-semibold text-gray-900">
+          <span className="flex-1 text-lg font-semibold text-gray-900">
             Noah&apos;s Zorg
           </span>
+          <NotificationBell />
         </div>
 
         {/* Navigation */}
@@ -67,22 +80,24 @@ export function Sidebar() {
                     >
                       <Icon className="h-5 w-5 flex-shrink-0" />
                       <span className="flex-1">{item.label}</span>
+
+                      {/* Badges per nav item */}
+                      {item.href === '/logboek' && (
+                        <NavBadge count={ongelezen.notities} />
+                      )}
+                      {item.href === '/overleggen' && (
+                        <NavBadge count={ongelezen.overleggen} />
+                      )}
                       {item.href === '/mail' && (
                         <span className="flex items-center gap-1">
                           {mailCounts.unread > 0 && (
-                            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
-                              {mailCounts.unread > 99 ? '99+' : mailCounts.unread}
-                            </span>
+                            <NavBadge count={mailCounts.unread} />
                           )}
                           {mailCounts.overleg > 0 && (
-                            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-orange-500 px-1.5 text-[10px] font-semibold text-white">
-                              {mailCounts.overleg > 99 ? '99+' : mailCounts.overleg}
-                            </span>
+                            <NavBadge count={mailCounts.overleg} color="bg-orange-500" />
                           )}
                           {mailCounts.unread === 0 && mailCounts.overleg === 0 && mailCounts.drafts > 0 && (
-                            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-gray-400 px-1.5 text-[10px] font-semibold text-white">
-                              {mailCounts.drafts > 99 ? '99+' : mailCounts.drafts}
-                            </span>
+                            <NavBadge count={mailCounts.drafts} color="bg-gray-400" />
                           )}
                         </span>
                       )}
@@ -96,7 +111,6 @@ export function Sidebar() {
 
         {/* Noodinformatie knop + user + logout */}
         <div className="px-3 pb-4">
-          {/* Noodinformatie — volledige breedte, boven de scheidingslijn */}
           <button
             onClick={() => setNoodOpen(true)}
             className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 active:bg-red-800"
@@ -105,7 +119,6 @@ export function Sidebar() {
             <span>Noodinformatie</span>
           </button>
 
-          {/* Scheidingslijn */}
           <div className="border-t border-gray-200 pt-4">
             {profile && (
               <div className="mb-3 flex items-center gap-3 rounded-lg px-3 py-2">

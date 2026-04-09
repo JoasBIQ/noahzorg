@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRealtime } from '@/hooks/use-realtime'
+import { markeerAlsGezien } from '@/lib/markeer-als-gezien'
 import { Header } from '@/components/layout/header'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -386,12 +387,22 @@ export function OverleggenPage({
   initialVerleden,
 }: OverleggenPageProps) {
   const supabase = createClient()
+  const currentUserId = _currentUserId
   const now = new Date().toISOString()
 
   const [overleggen, setOverleggen] = useState<Overleg[]>(
     initialOverleggen.filter((o) => !o.gearchiveerd && o.datum_tijd >= now)
       .sort((a, b) => a.datum_tijd.localeCompare(b.datum_tijd))
   )
+
+  // Markeer alle overleggen als gezien bij openen pagina
+  useEffect(() => {
+    const allIds = [
+      ...initialOverleggen.map((o) => o.id),
+      ...initialVerleden.map((o) => o.id),
+    ]
+    if (allIds.length > 0) markeerAlsGezien(currentUserId, 'overleg', allIds)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchOverleggen = useCallback(async () => {
     const { data } = await supabase
@@ -400,8 +411,11 @@ export function OverleggenPage({
       .eq('gearchiveerd', false)
       .gte('datum_tijd', new Date().toISOString())
       .order('datum_tijd', { ascending: true })
-    if (data) setOverleggen(data as Overleg[])
-  }, [supabase])
+    if (data) {
+      setOverleggen(data as Overleg[])
+      markeerAlsGezien(currentUserId, 'overleg', data.map((o) => o.id))
+    }
+  }, [supabase, currentUserId])
 
   useRealtime('overleggen', fetchOverleggen)
 

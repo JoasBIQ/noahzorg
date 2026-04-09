@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, BookOpen, Filter } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { LogEntryCard } from '@/components/logboek/log-entry'
 import { LogForm } from '@/components/logboek/log-form'
 import { CATEGORIE_LABELS } from '@/lib/constants'
+import { markeerAlsGezien } from '@/lib/markeer-als-gezien'
 import type { LogEntry, Profile, LogboekCategorie } from '@/types'
 
 interface LogboekPageProps {
@@ -67,9 +68,24 @@ export function LogboekPage({
     }
   }, [showArchived, supabase])
 
-  // Subscribe to realtime changes on logboek table
+  // Markeer alle zichtbare notities als gezien bij openen pagina
+  useEffect(() => {
+    const ids = initialEntries.map((e) => e.id)
+    if (ids.length > 0) markeerAlsGezien(currentUserId, 'notitie', ids)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Markeer ook nieuwe entries als gezien zodra ze binnenkomen via realtime
   useRealtime('logboek', () => {
-    fetchEntries()
+    fetchEntries().then(() => {
+      // entries state wordt bijgewerkt door fetchEntries, markeer daarna alle ids
+      supabase
+        .from('logboek')
+        .select('id')
+        .eq('gearchiveerd', false)
+        .then(({ data }) => {
+          if (data?.length) markeerAlsGezien(currentUserId, 'notitie', data.map((r) => r.id))
+        })
+    })
   })
 
   // Refetch when showArchived toggle changes
