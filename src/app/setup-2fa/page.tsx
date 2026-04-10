@@ -134,7 +134,7 @@ export default function Setup2FAPage() {
               <div className="flex justify-center">
                 <div className="p-3 bg-white border-2 border-gray-200 rounded-xl inline-block">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={qrCode} alt="QR-code voor authenticator" width={160} height={160} />
+                  <img src={qrCode} alt="QR-code voor authenticator" width={160} height={160} loading="lazy" />
                 </div>
               </div>
             ) : (

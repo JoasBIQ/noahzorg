@@ -15,22 +15,20 @@ export default async function NoahRoute() {
     redirect('/login')
   }
 
-  const [{ data: noahProfiel }, { data: currentProfile }] = await Promise.all([
+  const [{ data: noahProfiel }, { data: currentProfile }, { data: allProfiles }] = await Promise.all([
     supabase.from('noah_profiel').select('*').limit(1).single(),
     supabase.from('profiles').select('*').eq('id', user.id).single(),
+    // Haal alle profielen tegelijk op zodat we geen extra round-trip nodig hebben
+    // voor het updated_by profiel van Noah
+    supabase.from('profiles').select('id, naam, kleur'),
   ])
 
   const noah = noahProfiel as unknown as NoahProfiel | null
 
-  let updatedByProfile: Profile | null = null
-  if (noah?.updated_by) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', noah.updated_by)
-      .single()
-    updatedByProfile = data as unknown as Profile | null
-  }
+  const updatedByProfile =
+    noah?.updated_by
+      ? ((allProfiles ?? []).find((p) => p.id === noah.updated_by) as unknown as Profile | null) ?? null
+      : null
 
   return (
     <AppShell>
