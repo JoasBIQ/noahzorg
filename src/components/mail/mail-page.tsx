@@ -179,38 +179,100 @@ function MailDiscussion({
 }
 
 const MAANDEN: Record<string, number> = {
+  // Volledig
   januari: 1, februari: 2, maart: 3, april: 4, mei: 5, juni: 6,
   juli: 7, augustus: 8, september: 9, oktober: 10, november: 11, december: 12,
+  // Afkortingen NL/EN
+  jan: 1, feb: 2, mrt: 3, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, okt: 10, oct: 10, nov: 11, dec: 12,
+}
+
+function to24h(h: number, period: string): number {
+  if (period.toLowerCase() === 'pm' && h !== 12) return h + 12
+  if (period.toLowerCase() === 'am' && h === 12) return 0
+  return h
 }
 
 function extractDateFromText(text: string): string | null {
-  const pad = (n: number) => n.toString().padStart(2, '0')
+  return parseDateTimeFromText(text).start
+}
 
-  // Datum: "14 april" of "14 april 2026"
-  const datumRe = /(\d{1,2})\s+(januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)(?:\s+(\d{4}))?/i
+function parseDateTimeFromText(text: string): { start: string | null; end: string | null } {
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  const maandNamen = Object.keys(MAANDEN).join('|')
+  const datumRe = new RegExp(`(\\d{1,2})\\s+(${maandNamen})(?:\\s+(\\d{4}))?`, 'i')
   const datumMatch = text.match(datumRe)
-  if (!datumMatch) return null
+  if (!datumMatch) return { start: null, end: null }
 
   const dag = parseInt(datumMatch[1])
   const maand = MAANDEN[datumMatch[2].toLowerCase()]
+  if (!maand) return { start: null, end: null }
   const jaar = datumMatch[3] ? parseInt(datumMatch[3]) : new Date().getFullYear()
 
-  // Tijd: "14:00", "14.00", "om 14:00", "14:30 uur"
-  const tijdRe = /(?:om\s+)?(\d{1,2})[.:](\d{2})(?:\s*uur)?/gi
-  let uur = 10
-  let minuut = 0
-  let tijdMatch: RegExpExecArray | null
-  while ((tijdMatch = tijdRe.exec(text)) !== null) {
-    const h = parseInt(tijdMatch[1])
-    const m = parseInt(tijdMatch[2])
-    if (h >= 6 && h <= 22 && m >= 0 && m <= 59) {
-      uur = h
-      minuut = m
-      break
+  let startUur = 10, startMin = 0
+  let endUur: number | null = null, endMin = 0
+
+  // Patroon 1: "9pm - 10pm" of "9:30pm - 10:30pm"
+  const rangeAmPm = text.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*[-–]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i)
+  // Patroon 2: "21:00 - 22:00" of "9:00 - 10:00"
+  const range24 = text.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/)
+  // Patroon 3: enkele am/pm tijd
+  const singleAmPm = text.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i)
+  // Patroon 4: "14:00" of "om 14:00 uur"
+  const single24Re = /(?:om\s+)?(\d{1,2})[.:](\d{2})(?:\s*uur)?/gi
+  let single24Match: RegExpExecArray | null
+
+  if (rangeAmPm) {
+    startUur = to24h(parseInt(rangeAmPm[1]), rangeAmPm[3])
+    startMin = rangeAmPm[2] ? parseInt(rangeAmPm[2]) : 0
+    endUur = to24h(parseInt(rangeAmPm[4]), rangeAmPm[6])
+    endMin = rangeAmPm[5] ? parseInt(rangeAmPm[5]) : 0
+  } else if (range24) {
+    startUur = parseInt(range24[1])
+    startMin = parseInt(range24[2])
+    endUur = parseInt(range24[3])
+    endMin = parseInt(range24[4])
+  } else if (singleAmPm) {
+    startUur = to24h(parseInt(singleAmPm[1]), singleAmPm[3])
+    startMin = singleAmPm[2] ? parseInt(singleAmPm[2]) : 0
+  } else {
+    while ((single24Match = single24Re.exec(text)) !== null) {
+      const h = parseInt(single24Match[1])
+      const m = parseInt(single24Match[2])
+      if (h >= 6 && h <= 23 && m >= 0 && m <= 59) { startUur = h; startMin = m; break }
     }
   }
 
-  return `${jaar}-${pad(maand)}-${pad(dag)}T${pad(uur)}:${pad(minuut)}`
+  const datePrefix = `${jaar}-${pad(maand)}-${pad(dag)}`
+  return {
+    start: `${datePrefix}T${pad(startUur)}:${pad(startMin)}`,
+    end: endUur !== null ? `${datePrefix}T${pad(endUur)}:${pad(endMin)}` : null,
+  }
+}
+
+function extractMeetLink(text: string): string | null {
+  const patterns = [
+    /https?:\/\/meet\.google\.com\/[a-z0-9\-?=&%]+/i,
+    /https?:\/\/[a-z0-9.-]*zoom\.us\/[^\s"<>\]]+/i,
+    /https?:\/\/teams\.microsoft\.com\/[^\s"<>\]]+/i,
+    /https?:\/\/[a-z0-9.-]*\.webex\.com\/[^\s"<>\]]+/i,
+  ]
+  for (const re of patterns) {
+    const m = text.match(re)
+    if (m) return m[0]
+  }
+  return null
+}
+
+function isOnlineMeeting(text: string): boolean {
+  return /meet\.google\.com|google meet|microsoft teams|teams\.microsoft|zoom\.us|webex\.com/i.test(text)
+}
+
+function cleanTitle(subject: string): string {
+  return subject
+    .replace(/^uitnodiging:\s*/i, '')  // Verwijder "Uitnodiging: " prefix
+    .replace(/\s+op\s+.+$/i, '')        // Verwijder " op <datum>" suffix
+    .trim()
 }
 
 function MailItem({
@@ -276,18 +338,27 @@ function MailItem({
   }
 
   const handleOpenOverlegModal = () => {
-    setOverlegTitel(message.subject)
-    setOverlegAanwezigen('')
-    setOverlegNotities(message.snippet || '')
-    setOverlegType('fysiek')
-    setOverlegLocatie('')
-    setOverlegAangemaakt(false)
-
-    // Probeer datum/tijd te herkennen uit de mailinhoud
     const tekst = (message.body || message.snippet || '') + ' ' + message.subject
-    const extracted = extractDateFromText(tekst)
-    setOverlegDatum(extracted ?? '')
-    setDatumHerkend(!!extracted)
+
+    // Titel: verwijder "Uitnodiging: " prefix en " op <datum>" suffix
+    setOverlegTitel(cleanTitle(message.subject))
+
+    // Datum/tijd: parseer start- (en eindtijd voor weergave)
+    const { start } = parseDateTimeFromText(tekst)
+    setOverlegDatum(start ?? '')
+    setDatumHerkend(!!start)
+
+    // Type: detecteer online vergadering
+    const online = isOnlineMeeting(tekst)
+    setOverlegType(online ? 'online' : 'fysiek')
+
+    // Locatie: vul meeting-link in als online
+    const link = online ? extractMeetLink(tekst) : null
+    setOverlegLocatie(link ?? '')
+
+    setOverlegAanwezigen('')
+    setOverlegNotities('')
+    setOverlegAangemaakt(false)
     setShowOverlegModal(true)
   }
 
