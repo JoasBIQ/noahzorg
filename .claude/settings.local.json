@@ -32,7 +32,12 @@
       "Bash(node scripts/test-overleg-badge.mjs)",
       "Bash(node -e \":*)",
       "Bash(node scripts/get-inbox-ids.mjs)",
-      "Bash(/usr/local/bin/node node_modules/.bin/tsc --noEmit)"
+      "Bash(/usr/local/bin/node node_modules/.bin/tsc --noEmit)",
+      "Bash(export PATH=\"$PATH:/usr/local/bin:/opt/homebrew/bin\")",
+      "Read(//usr/local/bin/**)",
+      "Read(//opt/homebrew/**)",
+      "Read(//Users/joasdeinum/.nvm/versions/**)",
+      "Bash(/usr/local/bin/node node_modules/.bin/next build)"
     ]
   }
 }

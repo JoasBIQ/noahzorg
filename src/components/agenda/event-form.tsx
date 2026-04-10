@@ -202,7 +202,7 @@ export function EventForm({
 
       {!isEditing && (
         <p className="text-xs text-[#6B7280] bg-gray-50 rounded-lg px-3 py-2">
-          Afspraken worden opgeslagen in Noah&apos;s Zorg. Koppel Google Agenda via Beheer om automatisch te synchroniseren.
+          Afspraken worden opgeslagen in Rondom Noah. Koppel Google Agenda via Beheer om automatisch te synchroniseren.
         </p>
       )}
 

@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 // key: sleutelwoord voor app_instellingen (null = geen eigen key, alleen voor tussenliggende mappen)
 const FOLDER_TREE = [
   {
-    name: "Noah's Zorg",
+    name: "Rondom Noah",
     key: 'drive_root_folder_id',
     children: [
       {

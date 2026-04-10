@@ -39,13 +39,13 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/5 mb-4 overflow-hidden">
             <Image
               src="/icons/icon-192x192.png"
-              alt="Noah's Zorg"
+              alt="Rondom Noah"
               width={80}
               height={80}
               priority
             />
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900">Noah&apos;s Zorg</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Rondom Noah</h1>
           <p className="text-muted mt-1">Samen zorgen we voor Noah</p>
         </div>
 

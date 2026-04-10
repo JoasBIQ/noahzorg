@@ -49,10 +49,10 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-5">
           <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl overflow-hidden bg-[#FAFAF8]">
-            <Image src="/icons/icon-192x192.png" alt="Noah's Zorg" width={64} height={64} />
+            <Image src="/icons/icon-192x192.png" alt="Rondom Noah" width={64} height={64} />
           </div>
           <span className="flex-1 text-lg font-semibold text-gray-900">
-            Noah&apos;s Zorg
+            Rondom Noah
           </span>
         </div>
 

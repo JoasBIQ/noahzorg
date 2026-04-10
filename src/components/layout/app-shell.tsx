@@ -70,7 +70,7 @@ export function AppShell({ children }: AppShellProps) {
             <Link href="/profiel" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors">
               <User size={20} />
             </Link>
-            <span className="text-sm font-semibold text-gray-700">Noah&apos;s Zorg</span>
+            <span className="text-sm font-semibold text-gray-700">Rondom Noah</span>
           </div>
           <button
             onClick={() => setNoodOpen(true)}

@@ -134,9 +134,9 @@ export default function InviteAcceptPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#4A7C59]/10 mb-4 overflow-hidden">
-            <Image src="/icons/icon-192x192.png" alt="Noah's Zorg" width={56} height={56} />
+            <Image src="/icons/icon-192x192.png" alt="Rondom Noah" width={56} height={56} />
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900">Noah&apos;s Zorg</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Rondom Noah</h1>
           <p className="text-[#6B7280] text-sm mt-1">Je bent uitgenodigd om deel te nemen</p>
         </div>
 
@@ -181,7 +181,7 @@ export default function InviteAcceptPage() {
             <div className="bg-[#4A7C59]/8 border border-[#4A7C59]/20 rounded-xl px-4 py-3 mb-5 flex gap-3">
               <CheckCircle size={18} className="text-[#4A7C59] flex-shrink-0 mt-0.5" />
               <p className="text-sm text-[#374151]">
-                Welkom bij <strong>Noah&apos;s Zorg</strong>! Stel hieronder je naam en wachtwoord in om je account af te ronden.
+                Welkom bij <strong>Rondom Noah</strong>! Stel hieronder je naam en wachtwoord in om je account af te ronden.
               </p>
             </div>
 

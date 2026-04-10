@@ -88,9 +88,9 @@ export default function Verify2FAPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#4A7C59]/10 mb-4 overflow-hidden">
-            <Image src="/icons/icon-192x192.png" alt="Noah's Zorg" width={56} height={56} />
+            <Image src="/icons/icon-192x192.png" alt="Rondom Noah" width={56} height={56} />
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900">Noah&apos;s Zorg</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Rondom Noah</h1>
           <p className="text-[#6B7280] text-sm mt-1">Twee-staps verificatie</p>
         </div>
 

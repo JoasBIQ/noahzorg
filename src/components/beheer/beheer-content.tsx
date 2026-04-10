@@ -693,7 +693,7 @@ export function BeheerContent({ currentUserId, allProfiles }: BeheerContentProps
             <h2 className="text-base font-semibold text-gray-900">Google Drive — hoofdmap</h2>
           </div>
           <p className="text-sm text-[#6B7280] mb-4">
-            Vul het ID in van de hoofdmap in Google Drive die je als &quot;Noah&apos;s Zorg&quot;-map wilt gebruiken.
+            Vul het ID in van de hoofdmap in Google Drive die je als &quot;Rondom Noah&quot;-map wilt gebruiken.
             Het map-ID staat in de URL:{' '}
             <code className="bg-gray-100 px-1 rounded text-xs">drive.google.com/drive/folders/<strong>MAP_ID</strong></code>
           </p>
@@ -704,7 +704,7 @@ export function BeheerContent({ currentUserId, allProfiles }: BeheerContentProps
             <h3 className="text-sm font-semibold text-gray-800 mb-1">Mappenstructuur aanmaken</h3>
             <p className="text-sm text-[#6B7280] mb-4">
               Maakt automatisch de standaard mappenstructuur aan in Google Drive onder
-              &quot;Noah&apos;s Zorg&quot;. Bestaande mappen worden overgeslagen. Alle map-IDs
+              &quot;Rondom Noah&quot;. Bestaande mappen worden overgeslagen. Alle map-IDs
               worden opgeslagen in de instellingen.
             </p>
 

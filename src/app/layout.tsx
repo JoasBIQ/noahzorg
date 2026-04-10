@@ -5,7 +5,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: "Noah's Zorg",
+  title: "Rondom Noah",
   description: 'Zorgcoordinatie voor de familie van Noah',
   manifest: '/manifest.json',
   icons: {
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: "Noah's Zorg",
+    title: "Rondom Noah",
   },
 }
 
