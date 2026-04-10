@@ -25,6 +25,8 @@ interface ContactenTabProps {
   currentUserId: string
 }
 
+type ContactCategorie = 'familie' | 'zorg' | 'overig'
+
 interface Contact {
   id: string
   created_at: string
@@ -38,6 +40,7 @@ interface Contact {
   is_noodcontact: boolean
   nood_volgorde: number | null
   aangemaakt_door: string
+  categorie: ContactCategorie | null
 }
 
 interface ContactFormData {
@@ -50,6 +53,7 @@ interface ContactFormData {
   notities: string
   is_noodcontact: boolean
   nood_volgorde: string
+  categorie: ContactCategorie
 }
 
 const emptyForm: ContactFormData = {
@@ -62,7 +66,14 @@ const emptyForm: ContactFormData = {
   notities: '',
   is_noodcontact: false,
   nood_volgorde: '',
+  categorie: 'overig',
 }
+
+const CATEGORIE_OPTIES: { value: ContactCategorie; label: string; emoji: string }[] = [
+  { value: 'familie', label: 'Familie', emoji: '👨‍👩‍👧' },
+  { value: 'zorg', label: 'Zorg', emoji: '🏥' },
+  { value: 'overig', label: 'Overig', emoji: '📋' },
+]
 
 type FilterTab = 'alle' | 'noodcontacten' | 'familie' | 'zorg' | 'overig'
 
@@ -74,16 +85,13 @@ const filterTabs: { value: FilterTab; label: string }[] = [
   { value: 'overig', label: 'Overig' },
 ]
 
-function isFamilie(functie: string | null): boolean {
-  if (!functie) return false
-  const lower = functie.toLowerCase()
-  return ['familie', 'ouder', 'broer', 'zus'].some((k) => lower.includes(k))
-}
-
-function isZorg(functie: string | null): boolean {
-  if (!functie) return false
-  const lower = functie.toLowerCase()
-  return ['arts', 'begeleider', 'therapeut', 'zorg', 'verpleeg'].some((k) => lower.includes(k))
+function getCategorie(contact: Contact): ContactCategorie {
+  if (contact.categorie) return contact.categorie
+  // Fallback op functie-tekst voor bestaande contacten zonder categorie
+  const f = contact.functie?.toLowerCase() ?? ''
+  if (['familie', 'ouder', 'broer', 'zus'].some((k) => f.includes(k))) return 'familie'
+  if (['arts', 'begeleider', 'therapeut', 'zorg', 'verpleeg'].some((k) => f.includes(k))) return 'zorg'
+  return 'overig'
 }
 
 function noodLabel(volgorde: number | null): string {
@@ -143,13 +151,13 @@ export function ContactenTab({ currentUserId }: ContactenTabProps) {
         result = result.filter((c) => c.is_noodcontact)
         break
       case 'familie':
-        result = result.filter((c) => isFamilie(c.functie))
+        result = result.filter((c) => getCategorie(c) === 'familie')
         break
       case 'zorg':
-        result = result.filter((c) => isZorg(c.functie))
+        result = result.filter((c) => getCategorie(c) === 'zorg')
         break
       case 'overig':
-        result = result.filter((c) => !isFamilie(c.functie) && !isZorg(c.functie))
+        result = result.filter((c) => getCategorie(c) === 'overig')
         break
     }
 
@@ -184,6 +192,7 @@ export function ContactenTab({ currentUserId }: ContactenTabProps) {
       notities: contact.notities ?? '',
       is_noodcontact: contact.is_noodcontact,
       nood_volgorde: contact.nood_volgorde?.toString() ?? '',
+      categorie: getCategorie(contact),
     })
     setModalOpen(true)
   }
@@ -215,6 +224,7 @@ export function ContactenTab({ currentUserId }: ContactenTabProps) {
         nood_volgorde: formData.is_noodcontact && formData.nood_volgorde
           ? parseInt(formData.nood_volgorde, 10)
           : null,
+        categorie: formData.categorie,
         aangemaakt_door: currentUserId,
       }
 
@@ -466,6 +476,28 @@ export function ContactenTab({ currentUserId }: ContactenTabProps) {
             placeholder="Extra informatie..."
             rows={3}
           />
+
+          {/* Categorie */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Categorie</label>
+            <div className="flex gap-2">
+              {CATEGORIE_OPTIES.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => updateField('categorie', opt.value)}
+                  className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
+                    formData.categorie === opt.value
+                      ? 'border-[#4A7C59] bg-[#4A7C59]/10 text-[#4A7C59]'
+                      : 'border-gray-200 text-[#6B7280] hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="text-base">{opt.emoji}</span>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Noodcontact toggle */}
           <label className="flex items-center gap-3 cursor-pointer">
