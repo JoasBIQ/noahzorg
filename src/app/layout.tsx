@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: "Rondom Noah",
   description: 'Zorgcoordinatie voor de familie van Noah',
-  manifest: '/manifest.json',
+  manifest: '/manifest.json?v=3',
   icons: {
     icon: [
       { url: '/icons/icon-16x16.png', sizes: '16x16', type: 'image/png' },
