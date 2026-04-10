@@ -388,10 +388,16 @@ export function OverleggenPage({
 }: OverleggenPageProps) {
   const supabase = createClient()
   const currentUserId = _currentUserId
-  const now = new Date().toISOString()
+
+  // Een overleg blijft zichtbaar tot datum_tijd + 2 uur, zodat het item
+  // ook tijdens de vergadering nog gelezen kan worden.
+  function isUpcoming(o: Overleg): boolean {
+    const cutoff = new Date(new Date(o.datum_tijd).getTime() + 2 * 60 * 60 * 1000)
+    return !o.gearchiveerd && cutoff > new Date()
+  }
 
   const [overleggen, setOverleggen] = useState<Overleg[]>(
-    initialOverleggen.filter((o) => !o.gearchiveerd && o.datum_tijd >= now)
+    initialOverleggen.filter(isUpcoming)
       .sort((a, b) => a.datum_tijd.localeCompare(b.datum_tijd))
   )
 
@@ -405,15 +411,18 @@ export function OverleggenPage({
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchOverleggen = useCallback(async () => {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
     const { data } = await supabase
       .from('overleggen')
       .select('*')
       .eq('gearchiveerd', false)
-      .gte('datum_tijd', new Date().toISOString())
+      .gte('datum_tijd', twoHoursAgo)
       .order('datum_tijd', { ascending: true })
     if (data) {
-      setOverleggen(data as Overleg[])
-      markeerAlsGezien(currentUserId, 'overleg', data.map((o) => o.id))
+      // Pas ook client-side filter toe (eind_tijd + 2 uur)
+      const upcoming = (data as Overleg[]).filter(isUpcoming)
+      setOverleggen(upcoming)
+      markeerAlsGezien(currentUserId, 'overleg', upcoming.map((o) => o.id))
     }
   }, [supabase, currentUserId])
 
@@ -483,8 +492,8 @@ export function OverleggenPage({
   const [verledenZichtbaar, setVerledenZichtbaar] = useState(VERLEDEN_STAP)
 
   function handleSaved(updated: Overleg) {
-    // Als datum nu in verleden ligt: verplaats naar verleden-lijst
-    const isPast = new Date(updated.datum_tijd) < new Date()
+    // Als het overleg voorbij is (eind_tijd + 2 uur < nu): verplaats naar verleden-lijst
+    const isPast = !isUpcoming(updated)
     if (isPast) {
       setOverleggen((prev) => prev.filter((o) => o.id !== updated.id))
       setVerleden((prev) => {

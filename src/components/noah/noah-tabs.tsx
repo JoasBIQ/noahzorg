@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { Briefcase, Stethoscope, Users2, FolderOpen, ClipboardList } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { useState, useRef, useEffect } from 'react'
+import { Briefcase, Stethoscope, Users2, FolderOpen, ClipboardList, ChevronRight } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { Header } from '@/components/layout/header'
 import { WieIsNoahTab } from '@/components/noah/wie-is-noah-tab'
@@ -36,13 +36,34 @@ type TabId = (typeof TABS)[number]['id']
 
 export function NoahTabs({ noahProfiel, currentProfile, updatedByProfile }: NoahTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('wie-is-noah')
+  const tabsScrollRef = useRef<HTMLDivElement>(null)
+  const [showScrollHint, setShowScrollHint] = useState(true)
+
+  // Controleer of tabs überhaupt scrollbaar zijn (alleen op smal scherm)
+  useEffect(() => {
+    const el = tabsScrollRef.current
+    if (!el) return
+    // Als er geen overflow is, hoeven we de hint niet te tonen
+    if (el.scrollWidth <= el.clientWidth) {
+      setShowScrollHint(false)
+    }
+  }, [])
+
+  function handleTabsScroll() {
+    if (showScrollHint) setShowScrollHint(false)
+  }
 
   return (
     <div>
       <Header title="Noah" />
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 px-4 sm:px-6 overflow-x-auto">
+      {/* Tabs met scroll-indicator */}
+      <div className="relative border-b border-gray-200">
+        <div
+          ref={tabsScrollRef}
+          className="px-4 sm:px-6 overflow-x-auto"
+          onScroll={handleTabsScroll}
+        >
         <nav className="flex gap-1 -mb-px min-w-max">
           {TABS.map((tab) => {
             const Icon = tab.icon
@@ -71,6 +92,21 @@ export function NoahTabs({ noahProfiel, currentProfile, updatedByProfile }: Noah
             )
           })}
         </nav>
+        </div>
+
+        {/* Scroll-hint: gradient + chevron, verdwijnt na eerste scroll */}
+        <AnimatePresence>
+          {showScrollHint && (
+            <motion.div
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="pointer-events-none absolute right-0 top-0 bottom-0 flex items-center justify-end pr-2 w-12 bg-gradient-to-l from-white to-transparent sm:hidden"
+            >
+              <ChevronRight size={16} className="text-gray-400" />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Tab content */}

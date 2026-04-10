@@ -15,7 +15,12 @@ export default async function OverleggenRoute() {
     redirect('/login')
   }
 
-  const now = new Date().toISOString()
+  const now = new Date()
+  const nowIso = now.toISOString()
+  // Haal overleggen op die begonnen zijn tot max. 2 uur geleden — zodat lopende
+  // vergaderingen nog zichtbaar blijven. De client-side filter bepaalt daarna
+  // definitief op basis van eind_tijd + 2 uur.
+  const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
 
   const [
     { data: currentProfile },
@@ -25,8 +30,8 @@ export default async function OverleggenRoute() {
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('app_instellingen').select('value').eq('key', 'drive_map_verslagen').maybeSingle(),
-    supabase.from('overleggen').select('*').eq('gearchiveerd', false).gte('datum_tijd', now).order('datum_tijd', { ascending: true }),
-    supabase.from('overleggen').select('*').lt('datum_tijd', now).order('datum_tijd', { ascending: false }).limit(50),
+    supabase.from('overleggen').select('*').eq('gearchiveerd', false).gte('datum_tijd', twoHoursAgo).order('datum_tijd', { ascending: true }),
+    supabase.from('overleggen').select('*').lt('datum_tijd', twoHoursAgo).order('datum_tijd', { ascending: false }).limit(50),
   ])
 
   const verslagenFolderId = (verslagenSetting as { value: string } | null)?.value ?? null

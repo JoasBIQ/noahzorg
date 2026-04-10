@@ -67,8 +67,18 @@ export function AppShell({ children }: AppShellProps) {
         {/* Mobiele topbar */}
         <div className="lg:hidden px-4 pt-3 pb-1 space-y-2">
           <div className="flex items-center gap-3 pr-10">
-            <Link href="/profiel" className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors">
+            <Link
+              href="/profiel"
+              className="flex items-center gap-1.5 p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+            >
               <User size={20} />
+              {profile?.naam && (
+                <span className="text-sm font-medium text-gray-700 leading-tight">
+                  {profile.naam.length > 12
+                    ? profile.naam.slice(0, 12) + '…'
+                    : profile.naam.split(' ')[0]}
+                </span>
+              )}
             </Link>
             <span className="text-sm font-semibold text-gray-700">Rondom Noah</span>
           </div>

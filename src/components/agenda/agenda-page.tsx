@@ -318,7 +318,12 @@ export function AgendaPage({
   currentUserId,
 }: AgendaPageProps) {
   const [items, setItems] = useState<AgendaItem[]>(initialItems)
-  const [viewMode, setViewMode] = useState<ViewMode>('month')
+
+  // Op mobiel (< 768px) standaard dagweergave, op desktop maandweergave
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) return 'day'
+    return 'month'
+  })
   const [filterType, setFilterType] = useState<string>('alle')
   const [showFilters, setShowFilters] = useState(false)
   const [selectedItem, setSelectedItem] = useState<AgendaItem | null>(null)
@@ -329,6 +334,9 @@ export function AgendaPage({
 
   const supabase = createClient()
 
+  const initialCalendarView: CalendarView =
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'day' : 'month'
+
   const {
     currentDate,
     view: calendarView,
@@ -337,7 +345,7 @@ export function AgendaPage({
     goPrev,
     goNext,
     title: calendarTitle,
-  } = useCalendarNavigation('month')
+  } = useCalendarNavigation(initialCalendarView)
 
   const visibleRange = useMemo(() => {
     switch (calendarView) {
@@ -507,6 +515,14 @@ export function AgendaPage({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Weekweergave-waarschuwing op mobiel */}
+      {viewMode === 'week' && (
+        <div className="md:hidden flex items-center gap-2 mb-3 px-3 py-2.5 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-700">
+          <AlertCircle size={14} className="flex-shrink-0" />
+          Weekweergave is beter zichtbaar op een groter scherm.
+        </div>
+      )}
 
       {/* Calendar views */}
       {viewMode !== 'list' && (
