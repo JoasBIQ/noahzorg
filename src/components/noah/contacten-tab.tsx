@@ -69,10 +69,10 @@ const emptyForm: ContactFormData = {
   categorie: 'overig',
 }
 
-const CATEGORIE_OPTIES: { value: ContactCategorie; label: string; emoji: string }[] = [
-  { value: 'familie', label: 'Familie', emoji: '👨‍👩‍👧' },
-  { value: 'zorg', label: 'Zorg', emoji: '🏥' },
-  { value: 'overig', label: 'Overig', emoji: '📋' },
+const CATEGORIE_OPTIES: { value: ContactCategorie; label: string }[] = [
+  { value: 'familie', label: 'Familie' },
+  { value: 'zorg', label: 'Zorg' },
+  { value: 'overig', label: 'Overig' },
 ]
 
 type FilterTab = 'alle' | 'noodcontacten' | 'familie' | 'zorg' | 'overig'
@@ -480,19 +480,18 @@ export function ContactenTab({ currentUserId }: ContactenTabProps) {
           {/* Categorie */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Categorie</label>
-            <div className="flex gap-2">
+            <div className="flex gap-1">
               {CATEGORIE_OPTIES.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
                   onClick={() => updateField('categorie', opt.value)}
-                  className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     formData.categorie === opt.value
-                      ? 'border-[#4A7C59] bg-[#4A7C59]/10 text-[#4A7C59]'
-                      : 'border-gray-200 text-[#6B7280] hover:bg-gray-50'
+                      ? 'bg-[#4A7C59] text-white'
+                      : 'text-[#6B7280] hover:bg-gray-100'
                   }`}
                 >
-                  <span className="text-base">{opt.emoji}</span>
                   {opt.label}
                 </button>
               ))}
