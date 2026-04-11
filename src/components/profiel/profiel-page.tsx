@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Bell, BellOff, BellRing, Shield, ShieldCheck, User } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useProfile } from '@/hooks/use-profile'
 
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -62,11 +63,17 @@ async function swReady(): Promise<ServiceWorkerRegistration> {
 function TestNotificatieKnop() {
   const [bezig, setBezig] = useState(false)
   const [resultaat, setResultaat] = useState<string | null>(null)
+  const { user } = useProfile()
 
   async function stuurTest() {
+    if (!user?.id) {
+      setResultaat('Gebruiker niet gevonden, probeer opnieuw.')
+      return
+    }
     setBezig(true)
     setResultaat(null)
     try {
+      // Stuur testnotificatie alleen naar dit apparaat/gebruiker, niet naar iedereen
       const res = await fetch('/api/notifications/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -75,6 +82,7 @@ function TestNotificatieKnop() {
           body: 'Als je dit ziet werken push notificaties correct!',
           url: '/profiel',
           tag: 'test',
+          userId: user.id,
         }),
       })
       if (res.ok) {

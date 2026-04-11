@@ -9,6 +9,7 @@ import { MobileNav } from './mobile-nav'
 import { NotificationBell } from './notification-bell'
 import { NamePrompt } from '@/components/onboarding/name-prompt'
 import { NoodinformatieModal } from '@/components/noah/noodinformatie-modal'
+import { NotificatieBanner } from '@/components/notificatie-banner'
 import { useProfile } from '@/hooks/use-profile'
 
 interface AppShellProps {
@@ -90,6 +91,9 @@ export function AppShell({ children }: AppShellProps) {
             <span>Noodinformatie</span>
           </button>
         </div>
+
+        {/* Notificatie banner — eenmalig per sessie als push nog niet is ingeschakeld */}
+        <NotificatieBanner />
 
         {children}
       </main>
