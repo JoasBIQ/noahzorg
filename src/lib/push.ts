@@ -24,6 +24,15 @@ export interface PushPayload {
 }
 
 /**
+ * HTTP-statuscodes die aangeven dat een subscription definitief ongeldig is.
+ * 410 = Gone (standaard), 404 = Not Found (sommige push-services), 401 = Unauthorized
+ * (kan duiden op VAPID-mismatch of verlopen subscription-authenticatie).
+ */
+function isDeadSubscription(statusCode: number | undefined): boolean {
+  return statusCode === 410 || statusCode === 404 || statusCode === 401
+}
+
+/**
  * Stuur een push notificatie naar één specifieke gebruiker.
  */
 export async function sendPushToUser(
@@ -58,8 +67,8 @@ export async function sendPushToUser(
   } catch (err: unknown) {
     const code = (err as { statusCode?: number }).statusCode
     console.error('[push] sendPushToUser fout (statusCode=' + code + '):', err)
-    if (code === 410) {
-      console.log('[push] Subscription verlopen (410), opruimen voor user:', userId)
+    if (isDeadSubscription(code)) {
+      console.log('[push] Subscription ongeldig (' + code + '), opruimen voor user:', userId)
       await admin.from('push_subscriptions').delete().eq('user_id', userId)
     }
     return false
@@ -73,24 +82,34 @@ export async function sendPushToAll(
   payload: PushPayload,
   excludeUserId?: string
 ): Promise<void> {
-  console.log('[push] sendPushToAll:', payload.title, excludeUserId ? `(excl. ${excludeUserId})` : '')
+  console.log('[push] sendPushToAll:', payload.title, excludeUserId ? `(excl. ${excludeUserId})` : '(iedereen)')
   const admin = createAdminClient()
-  let query = admin.from('push_subscriptions').select('user_id, subscription')
-  if (excludeUserId) {
-    query = query.neq('user_id', excludeUserId)
-  }
-  const { data: subs, error } = await query
 
-  if (error) {
-    console.error('[push] DB fout bij ophalen subscriptions:', error)
-    return
-  }
-  if (!subs?.length) {
-    console.log('[push] Geen subscriptions gevonden om naar te sturen')
+  // Haal ALLE subscriptions op om het totale aantal te kunnen loggen
+  const { data: allSubs, error: countError } = await admin
+    .from('push_subscriptions')
+    .select('user_id, subscription')
+
+  if (countError) {
+    console.error('[push] DB fout bij ophalen subscriptions:', countError)
     return
   }
 
-  console.log('[push] Versturen naar', subs.length, 'subscribers')
+  const total = allSubs?.length ?? 0
+  const subs = excludeUserId
+    ? (allSubs ?? []).filter((r) => r.user_id !== excludeUserId)
+    : (allSubs ?? [])
+
+  console.log(`[push] Subscriptions: ${total} totaal, ${subs.length} na exclusie`)
+
+  if (!subs.length) {
+    if (total > 0 && excludeUserId) {
+      console.log('[push] Alle subscribers zijn uitgesloten (verzender is de enige subscriber)')
+    } else {
+      console.log('[push] Geen actieve subscriptions gevonden')
+    }
+    return
+  }
 
   await Promise.allSettled(
     subs.map(async (row) => {
@@ -103,10 +122,13 @@ export async function sendPushToAll(
       } catch (err: unknown) {
         const code = (err as { statusCode?: number }).statusCode
         console.error('[push] Fout voor user', row.user_id, '(statusCode=' + code + '):', err)
-        if (code === 410) {
+        if (isDeadSubscription(code)) {
+          console.log('[push] Subscription ongeldig (' + code + '), opruimen voor user:', row.user_id)
           await admin.from('push_subscriptions').delete().eq('user_id', row.user_id)
         }
       }
     })
   )
+
+  console.log('[push] sendPushToAll klaar')
 }

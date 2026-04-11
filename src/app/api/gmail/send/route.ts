@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       body: onderwerp ?? '(geen onderwerp)',
       url: '/mail',
       tag: 'mail-verstuurd',
-    }, user.id).catch(() => {})
+    }, user.id).catch((err) => console.error('[gmail/send] push notificatie fout:', err))
 
     return NextResponse.json({ success: true })
   } catch (error) {

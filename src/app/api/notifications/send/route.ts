@@ -39,7 +39,8 @@ export async function POST(request: NextRequest) {
       const ok = await sendPushToUser(userId, payload)
       console.log('[notifications/send] sendPushToUser resultaat:', ok)
     } else {
-      await sendPushToAll(payload, excludeUserId)
+      await sendPushToAll(payload, excludeUserId ?? undefined)
+      console.log('[notifications/send] sendPushToAll voltooid')
     }
 
     return NextResponse.json({ success: true })
