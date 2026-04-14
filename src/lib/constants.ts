@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Mail,
   HardDrive,
+  FileText,
 } from 'lucide-react'
 import { NoahNavIcon } from '@/components/layout/noah-nav-icon'
 import type { LogboekCategorie, TaakPrioriteit, TaakStatus, AgendaType } from '@/types'
@@ -31,6 +32,7 @@ export const NAV_ITEMS = [
   { label: 'Mail', href: '/mail', icon: Mail, adminOnly: false },
   { label: 'Drive', href: '/drive', icon: HardDrive, adminOnly: false },
   { label: 'Rondom Noah', href: '/team', icon: Users2, adminOnly: false },
+  { label: 'Exporteer dossier', href: '/export', icon: FileText, adminOnly: false },
   { label: 'Beheer', href: '/beheer', icon: UserCog, adminOnly: true },
 ] as const
 
