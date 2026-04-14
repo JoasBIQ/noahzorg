@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/gmail/check-incoming?secret=551f3f8491ad67ced100ac41fcda784956691602a9daf5587aaea648e72a317d",
+      "schedule": "* * * * *"
+    }
+  ]
+}

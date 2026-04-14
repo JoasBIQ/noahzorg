@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { AlertTriangle, User } from 'lucide-react'
 import Link from 'next/link'
@@ -11,6 +11,34 @@ import { NamePrompt } from '@/components/onboarding/name-prompt'
 import { NoodinformatieModal } from '@/components/noah/noodinformatie-modal'
 import { NotificatieBanner } from '@/components/notificatie-banner'
 import { useProfile } from '@/hooks/use-profile'
+
+// Achtergrond-polling voor binnenkomende Gmail berichten.
+// Draait elke 2 minuten zolang de app open is.
+const POLL_INTERVAL_MS = 2 * 60 * 1000
+
+function useGmailIncomingPoll() {
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    async function check() {
+      try {
+        await fetch('/api/gmail/check-incoming', { method: 'GET' })
+      } catch {
+        // Stil falen — geen console spam bij netwerk-uitval
+      }
+    }
+
+    // Direct checken bij opstarten
+    check()
+
+    // Dan elke 2 minuten
+    timerRef.current = setInterval(check, POLL_INTERVAL_MS)
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [])
+}
 
 interface AppShellProps {
   children: ReactNode
@@ -29,6 +57,9 @@ export function AppShell({ children }: AppShellProps) {
   const { profile, user, loading } = useProfile()
   const [nameCompleted, setNameCompleted] = useState(false)
   const [noodOpen, setNoodOpen] = useState(false)
+
+  // Achtergrond-polling voor binnenkomende mails
+  useGmailIncomingPoll()
 
   const needsName =
     !loading &&
