@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { ExternalLink, CheckSquare, Clock, Send, MessageCircle, Plus, X, Archive, HelpCircle, Mail, Copy, Check, ArrowRight, Trash2, GripVertical } from 'lucide-react'
+import { ExternalLink, CheckSquare, Clock, Send, MessageCircle, Plus, X, Archive, HelpCircle, Mail, Copy, Check, ArrowRight, Trash2, GripVertical, CheckCircle2, Circle } from 'lucide-react'
 import { DragDropContext, Draggable, type DropResult } from '@hello-pangea/dnd'
 import { StrictModeDroppable } from '@/components/ui/strict-mode-droppable'
 import { Button } from '@/components/ui/button'
@@ -120,9 +120,15 @@ function getDueDateStyle(due: string | null): { color: string; label?: string } 
 
 function TrelloCardItem({
   card,
+  isKlaar,
+  markingKlaar,
+  onMarkeerKlaar,
   onClick,
 }: {
   card: TrelloCard
+  isKlaar: boolean
+  markingKlaar: boolean
+  onMarkeerKlaar: (e: React.MouseEvent) => void
   onClick: () => void
 }) {
   const dueStyle = getDueDateStyle(card.due)
@@ -133,41 +139,76 @@ function TrelloCardItem({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === 'Enter') onClick() }}
-      className="w-full text-left bg-white rounded-lg shadow-sm p-3 hover:shadow-md transition-shadow cursor-pointer border border-gray-100 select-none"
+      className={`w-full text-left rounded-lg shadow-sm p-3 hover:shadow-md transition-shadow cursor-pointer border select-none ${
+        isKlaar
+          ? 'bg-green-50 border-green-200'
+          : 'bg-white border-gray-100'
+      }`}
     >
-      {card.labels.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-2">
-          {card.labels.map((label) => (
-            <Badge
-              key={label.id}
-              className={LABEL_COLORS[label.color] || 'bg-gray-100 text-gray-800'}
-            >
-              {getLabelDisplay(label)}
-            </Badge>
-          ))}
-        </div>
-      )}
+      <div className="flex items-start gap-2">
+        {/* Afvink-knop */}
+        <button
+          onClick={onMarkeerKlaar}
+          disabled={markingKlaar || isKlaar}
+          title={isKlaar ? 'Klaar' : 'Markeer als klaar'}
+          className={`flex-shrink-0 mt-0.5 transition-colors disabled:cursor-default ${
+            isKlaar
+              ? 'text-green-600'
+              : 'text-gray-300 hover:text-green-500'
+          }`}
+        >
+          {isKlaar
+            ? <CheckCircle2 size={18} className="fill-green-100" />
+            : markingKlaar
+              ? <Circle size={18} className="animate-pulse text-green-400" />
+              : <Circle size={18} />
+          }
+        </button>
 
-      <p className="text-sm font-medium text-gray-900">{card.name}</p>
-
-      <div className="flex items-center justify-between mt-2">
-        <div className="flex items-center gap-2">
-          {card.due && (
-            <span className={`flex items-center gap-1 text-xs ${dueStyle.color}`}>
-              <Clock size={12} />
-              {format(new Date(card.due), 'd MMM', { locale: nl })}
-              {dueStyle.label}
-            </span>
+        <div className="flex-1 min-w-0">
+          {card.labels.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-1.5">
+              {card.labels.map((label) => (
+                <Badge
+                  key={label.id}
+                  className={LABEL_COLORS[label.color] || 'bg-gray-100 text-gray-800'}
+                >
+                  {getLabelDisplay(label)}
+                </Badge>
+              ))}
+            </div>
           )}
-        </div>
 
-        {card.members && card.members.length > 0 && (
-          <div className="flex -space-x-1">
-            {card.members.map((member) => (
-              <MemberAvatar key={member.id} member={member} />
-            ))}
+          <p className={`text-sm font-medium ${isKlaar ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+            {card.name}
+          </p>
+
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center gap-2">
+              {isKlaar && (
+                <span className="flex items-center gap-1 text-xs font-medium text-green-600">
+                  <CheckCircle2 size={11} />
+                  Klaar
+                </span>
+              )}
+              {card.due && !isKlaar && (
+                <span className={`flex items-center gap-1 text-xs ${dueStyle.color}`}>
+                  <Clock size={12} />
+                  {format(new Date(card.due), 'd MMM', { locale: nl })}
+                  {dueStyle.label}
+                </span>
+              )}
+            </div>
+
+            {card.members && card.members.length > 0 && (
+              <div className="flex -space-x-1">
+                {card.members.map((member) => (
+                  <MemberAvatar key={member.id} member={member} />
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   )
@@ -236,20 +277,21 @@ function TakenInfoModal({ open, onClose }: { open: boolean; onClose: () => void 
 
         <div className="border-t border-gray-100" />
 
-        {/* Taak verplaatsen */}
+        {/* Taak afvinken */}
         <section>
           <h3 className="flex items-center gap-2 font-semibold text-gray-900 mb-3">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-blue-600 flex-shrink-0">
-              <GripVertical size={13} />
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-50 text-green-600 flex-shrink-0">
+              <CheckCircle2 size={13} />
             </div>
-            Taak verplaatsen
+            Taak afvinken als klaar
           </h3>
-          <p className="mb-3 text-[#6B7280]">Sleep een kaart van de ene naar de andere lijst om de status te wijzigen.</p>
+          <p className="mb-3 text-[#6B7280]">Tik op het rondje links op een kaart, of gebruik de groene &quot;Markeer als klaar&quot; knop in de kaartdetails. De taak verplaatst dan automatisch naar de <strong className="text-gray-700">Klaar</strong> lijst en blijft zichtbaar met een groene vinkje.</p>
           <div className="flex items-center gap-2 flex-wrap">
             {[
               { label: 'Inbox', color: 'bg-gray-100 text-gray-700' },
               { label: 'In behandeling', color: 'bg-blue-50 text-blue-700' },
-              { label: 'Gereed', color: 'bg-green-50 text-green-700' },
+              { label: '✓ Klaar', color: 'bg-green-100 text-green-700' },
+              { label: 'Archief (3d)', color: 'bg-gray-200 text-gray-500' },
             ].map((step, i, arr) => (
               <div key={step.label} className="flex items-center gap-2">
                 <span className={`rounded-lg px-2.5 py-1 text-xs font-medium ${step.color}`}>
@@ -263,17 +305,30 @@ function TakenInfoModal({ open, onClose }: { open: boolean; onClose: () => void 
 
         <div className="border-t border-gray-100" />
 
-        {/* Taak archiveren */}
+        {/* Automatisch archiveren */}
         <section>
           <h3 className="flex items-center gap-2 font-semibold text-gray-900 mb-3">
             <div className="flex h-6 w-6 items-center justify-center rounded-full bg-orange-50 text-orange-500 flex-shrink-0">
               <Archive size={13} />
             </div>
-            Taak archiveren
+            Automatisch archiveren na 3 dagen
           </h3>
           <p className="text-[#6B7280]">
-            Klik op een kaart en gebruik de <strong className="text-gray-700">&quot;Archiveer&quot;</strong> knop onderaan de modal. De taak verdwijnt uit het bord en wordt naar de Archief-lijst in Trello verplaatst.
+            In Trello is een <strong className="text-gray-700">Butler-automatisering</strong> ingesteld: kaarten in de &quot;Klaar&quot; lijst worden na 3 dagen automatisch verplaatst naar de &quot;Archief&quot; lijst. Gearchiveerde taken zijn niet zichtbaar op het bord, maar blijven bewaard in Trello.
           </p>
+        </section>
+
+        <div className="border-t border-gray-100" />
+
+        {/* Taak verplaatsen */}
+        <section>
+          <h3 className="flex items-center gap-2 font-semibold text-gray-900 mb-3">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-blue-600 flex-shrink-0">
+              <GripVertical size={13} />
+            </div>
+            Taak verplaatsen (slepen)
+          </h3>
+          <p className="text-[#6B7280]">Je kunt kaarten ook handmatig slepen tussen lijsten om de status te wijzigen.</p>
         </section>
 
         <div className="border-t border-gray-100" />
@@ -306,6 +361,9 @@ function CardDetailModal({
   onUrgentieChanged,
   onArchived,
   onDueChanged,
+  onMarkeerKlaar,
+  klaarListId,
+  isKlaar,
   isBeheerder,
 }: {
   card: TrelloCard | null
@@ -314,6 +372,9 @@ function CardDetailModal({
   onUrgentieChanged?: (cardId: string, urgentie: string) => void
   onArchived?: (cardId: string) => void
   onDueChanged?: (cardId: string, due: string | null) => void
+  onMarkeerKlaar?: (cardId: string) => void
+  klaarListId?: string | null
+  isKlaar?: boolean
   isBeheerder?: boolean
 }) {
   const [comments, setComments] = useState<TrelloComment[]>([])
@@ -323,6 +384,7 @@ function CardDetailModal({
   const [urgentie, setUrgentie] = useState('')
   const [savingUrgentie, setSavingUrgentie] = useState(false)
   const [archiving, setArchiving] = useState(false)
+  const [markingKlaar, setMarkingKlaar] = useState(false)
   const [dueEdit, setDueEdit] = useState('')
   const [savingDue, setSavingDue] = useState(false)
 
@@ -390,6 +452,26 @@ function CardDetailModal({
       console.error('Archiveren mislukt:', err)
     } finally {
       setArchiving(false)
+    }
+  }
+
+  const handleMarkeerKlaarModal = async () => {
+    if (!card || markingKlaar || !klaarListId || isKlaar) return
+    setMarkingKlaar(true)
+    try {
+      const res = await fetch('/api/trello/card', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId: card.id, idList: klaarListId }),
+      })
+      if (res.ok) {
+        onMarkeerKlaar?.(card.id)
+        onClose()
+      }
+    } catch (err) {
+      console.error('Markeren als klaar mislukt:', err)
+    } finally {
+      setMarkingKlaar(false)
     }
   }
 
@@ -588,27 +670,47 @@ function CardDetailModal({
           )}
         </div>
 
-        <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-3">
-          <a
-            href={card.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-sm text-[#4A7C59] hover:underline"
-          >
-            <ExternalLink size={14} />
-            Openen in Trello
-          </a>
-
-          {isBeheerder && (
+        <div className="pt-2 border-t border-gray-100 space-y-3">
+          {/* Markeer als klaar — prominente knop */}
+          {klaarListId && !isKlaar && (
             <button
-              onClick={handleArchive}
-              disabled={archiving}
-              className="flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-red-600 transition-colors disabled:opacity-50"
+              onClick={handleMarkeerKlaarModal}
+              disabled={markingKlaar}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 active:bg-green-800 disabled:opacity-50 transition-colors"
             >
-              <Archive size={14} />
-              {archiving ? 'Archiveren...' : 'Archiveer'}
+              <CheckCircle2 size={16} />
+              {markingKlaar ? 'Markeren...' : 'Markeer als klaar'}
             </button>
           )}
+          {isKlaar && (
+            <div className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-semibold">
+              <CheckCircle2 size={16} />
+              Klaar
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3">
+            <a
+              href={card.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sm text-[#4A7C59] hover:underline"
+            >
+              <ExternalLink size={14} />
+              Openen in Trello
+            </a>
+
+            {isBeheerder && (
+              <button
+                onClick={handleArchive}
+                disabled={archiving}
+                className="flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-red-600 transition-colors disabled:opacity-50"
+              >
+                <Archive size={14} />
+                {archiving ? 'Archiveren...' : 'Archiveer'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </Modal>
@@ -722,7 +824,12 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: Tr
   const [addingToList, setAddingToList] = useState<string | null>(null)
   const [showInfo, setShowInfo] = useState(false)
   const [prefillTekst, setPrefillTekst] = useState<string | undefined>(initialTaakTekst)
+  const [markingKlaarId, setMarkingKlaarId] = useState<string | null>(null)
   const didAutoOpen = useRef(false)
+
+  // De "Klaar" lijst detecteren (case-insensitief)
+  const klaarList = lists.find((l) => l.name.toLowerCase() === 'klaar')
+  const klaarListId = klaarList?.id ?? null
 
   const fetchBoard = useCallback(async () => {
     try {
@@ -836,6 +943,44 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: Tr
     }
   }
 
+  const handleMarkeerKlaar = async (cardId: string) => {
+    if (!klaarListId || markingKlaarId) return
+    setMarkingKlaarId(cardId)
+
+    // Optimistic update: verplaats kaart naar klaarList
+    setLists((prev) => {
+      let movedCard: TrelloCard | undefined
+      const without = prev.map((list) => {
+        const idx = list.cards.findIndex((c) => c.id === cardId)
+        if (idx === -1) return list
+        movedCard = { ...list.cards[idx], idList: klaarListId }
+        return { ...list, cards: list.cards.filter((c) => c.id !== cardId) }
+      })
+      if (!movedCard) return prev
+      return without.map((list) =>
+        list.id === klaarListId
+          ? { ...list, cards: [movedCard!, ...list.cards] }
+          : list
+      )
+    })
+
+    try {
+      const res = await fetch('/api/trello/card', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId, idList: klaarListId }),
+      })
+      if (!res.ok) {
+        // Revert bij fout
+        await fetchBoard()
+      }
+    } catch {
+      await fetchBoard()
+    } finally {
+      setMarkingKlaarId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-4 lg:p-8 flex items-center justify-center min-h-[50vh]">
@@ -935,11 +1080,16 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: Tr
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-gray-50 rounded-xl p-3 min-w-[280px] max-w-[320px] flex-shrink-0 flex flex-col"
+                className={`rounded-xl p-3 min-w-[280px] max-w-[320px] flex-shrink-0 flex flex-col ${
+                  list.id === klaarListId ? 'bg-green-50' : 'bg-gray-50'
+                }`}
               >
-                <h2 className="text-sm font-semibold text-gray-700 px-1 mb-3">
+                <h2 className={`text-sm font-semibold px-1 mb-3 flex items-center gap-1.5 ${
+                  list.id === klaarListId ? 'text-green-700' : 'text-gray-700'
+                }`}>
+                  {list.id === klaarListId && <CheckCircle2 size={14} className="text-green-600" />}
                   {list.name}
-                  <span className="ml-2 text-xs font-normal text-[#6B7280]">
+                  <span className="ml-1 text-xs font-normal text-[#6B7280]">
                     {list.cards.length}
                   </span>
                 </h2>
@@ -964,6 +1114,12 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: Tr
                             >
                               <TrelloCardItem
                                 card={card}
+                                isKlaar={list.id === klaarListId}
+                                markingKlaar={markingKlaarId === card.id}
+                                onMarkeerKlaar={(e) => {
+                                  e.stopPropagation()
+                                  if (list.id !== klaarListId) handleMarkeerKlaar(card.id)
+                                }}
                                 onClick={() => !dragSnapshot.isDragging && setSelectedCard(card)}
                               />
                             </div>
@@ -1028,6 +1184,11 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: Tr
         open={!!selectedCard}
         onClose={() => setSelectedCard(null)}
         isBeheerder={isBeheerder}
+        klaarListId={klaarListId}
+        isKlaar={selectedCard ? selectedCard.idList === klaarListId : false}
+        onMarkeerKlaar={(cardId) => {
+          handleMarkeerKlaar(cardId)
+        }}
         onArchived={(cardId) => {
           setLists((prev) =>
             prev.map((list) => ({
