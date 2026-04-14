@@ -67,7 +67,7 @@ VALUES
    'https://www.farmacotherapeutischkompas.nl/bladeren/preparaatteksten/h/hypromellose',
    'Kunsttranen — droge ogen', NULL),
 
-  ('Lorazepam 1mg', 'Lorazepam', '1 mg met water', 'Oraal', 'Ochtend', '2026-04-14', true,
+  ('Lorazepam', 'Lorazepam', '1 mg met water', 'Oraal', 'Ochtend', '2026-04-14', true,
    'https://www.farmacotherapeutischkompas.nl/bladeren/preparaatteksten/l/lorazepam',
    'Benzodiazepine — angst en spanning', NULL),
 
@@ -76,7 +76,7 @@ VALUES
    'Calciumantagonist — bloeddruk', NULL),
 
   -- Lunch
-  ('Lorazepam 0,5mg', 'Lorazepam', '0,5 mg', 'Oraal', 'Lunch', '2026-04-14', true,
+  ('Lorazepam', 'Lorazepam', '0,5 mg', 'Oraal', 'Lunch', '2026-04-14', true,
    'https://www.farmacotherapeutischkompas.nl/bladeren/preparaatteksten/l/lorazepam',
    'Benzodiazepine — angst en spanning', NULL),
 
@@ -93,7 +93,7 @@ VALUES
    NULL,
    'Vitaminesuppletie', NULL),
 
-  ('Lorazepam 0,5mg', 'Lorazepam', '0,5 mg', 'Oraal', 'Uur voor bedtijd', '2026-04-14', true,
+  ('Lorazepam', 'Lorazepam', '0,5 mg', 'Oraal', 'Uur voor bedtijd', '2026-04-14', true,
    'https://www.farmacotherapeutischkompas.nl/bladeren/preparaatteksten/l/lorazepam',
    'Benzodiazepine — angst en spanning', NULL),
 
@@ -103,6 +103,6 @@ VALUES
    'Oogdruppels — verhoogde oogdruk (glaucoom)', NULL),
 
   -- Zo nodig
-  ('Lorazepam 1mg', 'Lorazepam', '1 mg max 1× per dag', 'Oraal', 'Zo nodig', '2026-04-14', true,
+  ('Lorazepam', 'Lorazepam', '1 mg max 1× per dag', 'Oraal', 'Zo nodig', '2026-04-14', true,
    'https://www.farmacotherapeutischkompas.nl/bladeren/preparaatteksten/l/lorazepam',
    'Benzodiazepine — angst en spanning', NULL);

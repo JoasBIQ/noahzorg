@@ -44,13 +44,14 @@ interface MedicatieDossierProps {
   currentUserId: string
 }
 
-// Grouped: één groep per unieke naam in actueel
+// Grouped: één groep per unieke naam (case-insensitive) in actueel
 interface MedicatieGroep {
   naam: string
   werkzame_stof: string | null
   fk_url: string | null
   indicatie: string | null
-  items: MedicatieItem[]   // gesorteerd op tijdstip
+  displayItems: MedicatieItem[]  // gesorteerd + gedededupliceerd op tijdstip+dosering+toediening
+  allItems: MedicatieItem[]      // alle onderliggende DB-rijen (voor edit/stop in detail modal)
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -157,20 +158,41 @@ export function MedicatieDossier({ currentUserId }: MedicatieDossierProps) {
   const actueelItems = sortByTijdstip(medicaties.filter((m) => m.actief))
   const historieItems = medicaties.filter((m) => !m.actief)
 
-  // Groepeer actuele medicijnen op naam
+  // Groepeer actuele medicijnen op naam (case-insensitive, getrimmed)
   const actueelGroepen = useMemo<MedicatieGroep[]>(() => {
-    const map = new Map<string, MedicatieItem[]>()
+    // Map key = genormaliseerde naam; value = { weergavenaam, alle rijen }
+    const map = new Map<string, { naam: string; items: MedicatieItem[] }>()
     for (const item of actueelItems) {
-      if (!map.has(item.naam)) map.set(item.naam, [])
-      map.get(item.naam)!.push(item)
+      const key = item.naam.trim().toLowerCase()
+      if (!map.has(key)) map.set(key, { naam: item.naam.trim(), items: [] })
+      map.get(key)!.items.push(item)
     }
-    return Array.from(map.entries()).map(([naam, items]) => ({
-      naam,
-      werkzame_stof: items[0]?.werkzame_stof ?? null,
-      fk_url: items[0]?.fk_url ?? null,
-      indicatie: items[0]?.indicatie ?? null,
-      items,
-    }))
+
+    return Array.from(map.values()).map(({ naam, items }) => {
+      // Dedupliceer op tijdstip + dosering + toediening voor de kaartweergave
+      const seen = new Set<string>()
+      const displayItems = sortByTijdstip(
+        items.filter((item) => {
+          const dedupKey = [
+            (item.tijdstip ?? '').toLowerCase().trim(),
+            (item.dosering ?? '').toLowerCase().trim(),
+            (item.toediening ?? '').toLowerCase().trim(),
+          ].join('|')
+          if (seen.has(dedupKey)) return false
+          seen.add(dedupKey)
+          return true
+        })
+      )
+
+      return {
+        naam,
+        werkzame_stof: items[0]?.werkzame_stof ?? null,
+        fk_url: items[0]?.fk_url ?? null,
+        indicatie: items[0]?.indicatie ?? null,
+        displayItems,
+        allItems: items,
+      }
+    })
   }, [actueelItems])
 
   // ── Form handlers ──────────────────────────────────────────────────────────
@@ -619,9 +641,9 @@ function ActueelGroepKaart({
         )}
       </div>
 
-      {/* Tijdstip regels */}
+      {/* Tijdstip regels — gededupliceerd */}
       <div className="mt-2.5 space-y-1">
-        {groep.items.map((item) => (
+        {groep.displayItems.map((item) => (
           <div key={item.id} className="flex items-baseline gap-2">
             {item.tijdstip && (
               <span className={tijdstipBadgeStyle}>{item.tijdstip}</span>
@@ -650,7 +672,7 @@ function DetailModal({
   onStop: (item: MedicatieItem) => void
 }) {
   // Gebruik eerste item voor gedeelde velden
-  const eerste = groep.items[0]
+  const eerste = groep.allItems[0]
 
   return (
     <div
@@ -685,11 +707,11 @@ function DetailModal({
 
         {/* Body */}
         <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
-          {/* Dosering(en) per tijdstip */}
+          {/* Dosering(en) per tijdstip — alle onderliggende rijen voor edit/stop */}
           <div>
             <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-2">Toediening</p>
             <div className="space-y-2">
-              {groep.items.map((item) => (
+              {groep.allItems.map((item) => (
                 <div
                   key={item.id}
                   className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2 gap-2"
