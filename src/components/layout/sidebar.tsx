@@ -81,9 +81,6 @@ export function Sidebar() {
                       <span className="flex-1">{item.label}</span>
 
                       {/* Badges per nav item */}
-                      {item.href === '/logboek' && (
-                        <NavBadge count={ongelezen.notities} />
-                      )}
                       {item.href === '/overleggen' && (
                         <NavBadge count={ongelezen.overleggen} />
                       )}

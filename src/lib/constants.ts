@@ -1,6 +1,5 @@
 import {
   Home,
-  BookOpen,
   CheckSquare,
   Calendar,
   Users2,
@@ -25,7 +24,6 @@ export const USER_COLORS = [
 export const NAV_ITEMS = [
   { label: 'Home', href: '/', icon: Home, adminOnly: false },
   { label: 'Noah', href: '/noah', icon: NoahNavIcon, adminOnly: false },
-  { label: 'Notities over Noah', href: '/logboek', icon: BookOpen, adminOnly: false },
   { label: 'Agenda', href: '/agenda', icon: Calendar, adminOnly: false },
   { label: 'Taken', href: '/taken', icon: CheckSquare, adminOnly: false },
   { label: 'Familieoverleg', href: '/overleggen', icon: MessageSquare, adminOnly: false },
