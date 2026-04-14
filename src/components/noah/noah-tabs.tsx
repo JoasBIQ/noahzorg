@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Briefcase, Stethoscope, Users2, FolderOpen, ClipboardList, ChevronRight } from 'lucide-react'
+import { Briefcase, Stethoscope, Users2, FolderOpen, ClipboardList, ChevronRight, BookOpen } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { Header } from '@/components/layout/header'
@@ -11,6 +11,7 @@ import { MedischTab } from '@/components/noah/medisch-tab'
 import { ContactenTab } from '@/components/noah/contacten-tab'
 import { DossierTab } from '@/components/noah/dossier-tab'
 import { ZorgplanContent } from '@/components/zorgplan/zorgplan-content'
+import { NotitiesTab } from '@/components/noah/notities-tab'
 import type { Profile, NoahProfiel } from '@/types'
 
 interface NoahTabsProps {
@@ -25,6 +26,7 @@ function NoahTabIcon(_props: { size?: number; className?: string }) {
 
 const TABS = [
   { id: 'wie-is-noah', label: 'Wie is Noah', icon: NoahTabIcon },
+  { id: 'notities', label: 'Notities', icon: BookOpen },
   { id: 'praktisch', label: 'Praktisch', icon: Briefcase },
   { id: 'medisch', label: 'Medisch', icon: Stethoscope },
   { id: 'contacten', label: 'Contacten', icon: Users2 },
@@ -113,6 +115,9 @@ export function NoahTabs({ noahProfiel, currentProfile, updatedByProfile }: Noah
       <div>
         {activeTab === 'wie-is-noah' && (
           <WieIsNoahTab currentUserId={currentProfile.id} />
+        )}
+        {activeTab === 'notities' && (
+          <NotitiesTab currentProfile={currentProfile} />
         )}
         {activeTab === 'praktisch' && (
           <PraktischTab currentUserId={currentProfile.id} />
