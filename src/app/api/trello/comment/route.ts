@@ -1,115 +1,118 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'
 
-// GET: ophalen van comments voor een kaart
+// GET: notities voor een kaart ophalen uit Supabase (met app-profielnamen)
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient()
     const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Niet ingelogd.' }, { status: 401 })
-    }
+    if (!user) return NextResponse.json({ error: 'Niet ingelogd.' }, { status: 401 })
 
     const cardId = request.nextUrl.searchParams.get('cardId')
-    if (!cardId) {
-      return NextResponse.json({ error: 'cardId is verplicht.' }, { status: 400 })
-    }
+    if (!cardId) return NextResponse.json({ error: 'cardId is verplicht.' }, { status: 400 })
 
-    const { data: allSettings } = await supabase
-      .from('app_instellingen')
-      .select('key, value')
-      .in('key', ['trello_api_key', 'trello_api_token'])
+    const adminClient = createAdminClient()
+    const { data: notities, error } = await adminClient
+      .from('trello_kaart_notities')
+      .select(`
+        id,
+        bericht,
+        created_at,
+        profiles:auteur_id ( naam, kleur )
+      `)
+      .eq('trello_card_id', cardId)
+      .order('created_at', { ascending: false })
 
-    const settingsMap: Record<string, string> = {}
-    for (const s of allSettings || []) {
-      settingsMap[s.key] = s.value
-    }
+    if (error) throw error
 
-    const apiKey = settingsMap['trello_api_key']
-    const apiToken = settingsMap['trello_api_token']
-
-    if (!apiKey || !apiToken) {
-      return NextResponse.json({ error: 'Trello niet geconfigureerd.' }, { status: 400 })
-    }
-
-    const res = await fetch(
-      `https://api.trello.com/1/cards/${cardId}/actions?filter=commentCard&key=${apiKey}&token=${apiToken}`
-    )
-
-    if (!res.ok) {
-      const errText = await res.text()
-      return NextResponse.json({ error: `Trello fout (${res.status}): ${errText}` }, { status: res.status })
-    }
-
-    const actions = await res.json()
-    const comments = actions.map((a: { id: string; data: { text: string }; memberCreator: { fullName: string }; date: string }) => ({
-      id: a.id,
-      text: a.data.text,
-      memberCreator: a.memberCreator.fullName,
-      date: a.date,
-    }))
+    const comments = (notities ?? []).map((n) => {
+      const profile = n.profiles as unknown as { naam: string; kleur: string } | null
+      return {
+        id: n.id,
+        text: n.bericht,
+        memberCreator: profile?.naam ?? 'Onbekend',
+        kleur: profile?.kleur ?? '#4A7C59',
+        date: n.created_at,
+      }
+    })
 
     return NextResponse.json({ comments })
   } catch (error) {
-    console.error('Trello comments fetch error:', error)
-    return NextResponse.json({ error: 'Comments ophalen mislukt.' }, { status: 500 })
+    console.error('Notities ophalen mislukt:', error)
+    return NextResponse.json({ error: 'Notities ophalen mislukt.' }, { status: 500 })
   }
 }
 
-// POST: nieuw comment toevoegen
+// POST: nieuwe notitie opslaan in Supabase én doorsturen naar Trello
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient()
     const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Niet ingelogd.' }, { status: 401 })
-    }
+    if (!user) return NextResponse.json({ error: 'Niet ingelogd.' }, { status: 401 })
 
     const { cardId, text } = await request.json()
-
     if (!cardId || !text?.trim()) {
       return NextResponse.json({ error: 'cardId en text zijn verplicht.' }, { status: 400 })
     }
 
+    const adminClient = createAdminClient()
+
+    // Haal profielnaam op voor prefix in Trello-comment
+    const { data: profile } = await adminClient
+      .from('profiles')
+      .select('naam, kleur')
+      .eq('id', user.id)
+      .single()
+
+    const naam = profile?.naam ?? 'Onbekend'
+
+    // Sla op in Supabase
+    const { data: inserted, error: insertError } = await adminClient
+      .from('trello_kaart_notities')
+      .insert({ trello_card_id: cardId, auteur_id: user.id, bericht: text.trim() })
+      .select('id, created_at')
+      .single()
+
+    if (insertError) throw insertError
+
+    // Stuur ook naar Trello (met naam als prefix zodat het leesbaar is in Trello zelf)
     const { data: allSettings } = await supabase
       .from('app_instellingen')
       .select('key, value')
       .in('key', ['trello_api_key', 'trello_api_token'])
 
     const settingsMap: Record<string, string> = {}
-    for (const s of allSettings || []) {
-      settingsMap[s.key] = s.value
-    }
+    for (const s of allSettings || []) settingsMap[s.key] = s.value
 
     const apiKey = settingsMap['trello_api_key']
     const apiToken = settingsMap['trello_api_token']
 
-    if (!apiKey || !apiToken) {
-      return NextResponse.json({ error: 'Trello niet geconfigureerd.' }, { status: 400 })
+    if (apiKey && apiToken) {
+      await fetch(
+        `https://api.trello.com/1/cards/${cardId}/actions/comments?key=${apiKey}&token=${apiToken}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: `[${naam}] ${text.trim()}` }),
+        }
+      ).catch((err) => console.error('[Trello] Comment doorsturen mislukt:', err))
     }
 
-    const res = await fetch(
-      `https://api.trello.com/1/cards/${cardId}/actions/comments?key=${apiKey}&token=${apiToken}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.trim() }),
-      }
-    )
-
-    if (!res.ok) {
-      const errText = await res.text()
-      return NextResponse.json({ error: `Trello fout (${res.status}): ${errText}` }, { status: res.status })
-    }
-
-    const comment = await res.json()
-    return NextResponse.json({ success: true, comment })
+    return NextResponse.json({
+      success: true,
+      comment: {
+        id: inserted.id,
+        text: text.trim(),
+        memberCreator: naam,
+        kleur: profile?.kleur ?? '#4A7C59',
+        date: inserted.created_at,
+      },
+    })
   } catch (error) {
-    console.error('Trello comment post error:', error)
-    return NextResponse.json({ error: 'Comment plaatsen mislukt.' }, { status: 500 })
+    console.error('Notitie plaatsen mislukt:', error)
+    return NextResponse.json({ error: 'Notitie plaatsen mislukt.' }, { status: 500 })
   }
 }

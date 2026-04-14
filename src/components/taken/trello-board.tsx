@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { ExternalLink, CheckSquare, Clock, Send, MessageCircle, Plus, X, Archive, HelpCircle, Mail, Copy, Check, ArrowRight, Trash2, GripVertical, CheckCircle2, Circle } from 'lucide-react'
+import { ExternalLink, CheckSquare, Clock, Send, MessageCircle, Plus, X, Archive, HelpCircle, Mail, Copy, Check, ArrowRight, Trash2, GripVertical, CheckCircle2, Circle, Pencil } from 'lucide-react'
 import { DragDropContext, Draggable, type DropResult } from '@hello-pangea/dnd'
 import { StrictModeDroppable } from '@/components/ui/strict-mode-droppable'
 import { Button } from '@/components/ui/button'
@@ -39,6 +39,8 @@ interface TrelloCard {
   url: string
   desc: string
   members?: TrelloMember[]
+  aangemaakt_door_naam?: string
+  aangemaakt_door_kleur?: string
 }
 
 interface TrelloList {
@@ -51,6 +53,7 @@ interface TrelloComment {
   id: string
   text: string
   memberCreator: string
+  kleur?: string
   date: string
 }
 
@@ -184,7 +187,7 @@ function TrelloCardItem({
           </p>
 
           <div className="flex items-center justify-between mt-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {isKlaar && (
                 <span className="flex items-center gap-1 text-xs font-medium text-green-600">
                   <CheckCircle2 size={11} />
@@ -200,12 +203,14 @@ function TrelloCardItem({
               )}
             </div>
 
-            {card.members && card.members.length > 0 && (
-              <div className="flex -space-x-1">
-                {card.members.map((member) => (
-                  <MemberAvatar key={member.id} member={member} />
-                ))}
-              </div>
+            {card.aangemaakt_door_naam && (
+              <span
+                className="flex-shrink-0 text-xs font-medium px-1.5 py-0.5 rounded-full text-white"
+                style={{ backgroundColor: card.aangemaakt_door_kleur ?? '#4A7C59' }}
+                title={`Aangemaakt door ${card.aangemaakt_door_naam}`}
+              >
+                {card.aangemaakt_door_naam.split(' ')[0]}
+              </span>
             )}
           </div>
         </div>
@@ -362,6 +367,7 @@ function CardDetailModal({
   onArchived,
   onDueChanged,
   onMarkeerKlaar,
+  onCardUpdated,
   klaarListId,
   isKlaar,
   isBeheerder,
@@ -373,6 +379,7 @@ function CardDetailModal({
   onArchived?: (cardId: string) => void
   onDueChanged?: (cardId: string, due: string | null) => void
   onMarkeerKlaar?: (cardId: string) => void
+  onCardUpdated?: (cardId: string, updates: Partial<TrelloCard>) => void
   klaarListId?: string | null
   isKlaar?: boolean
   isBeheerder?: boolean
@@ -387,9 +394,17 @@ function CardDetailModal({
   const [markingKlaar, setMarkingKlaar] = useState(false)
   const [dueEdit, setDueEdit] = useState('')
   const [savingDue, setSavingDue] = useState(false)
+  // Bewerken
+  const [editMode, setEditMode] = useState(false)
+  const [editNaam, setEditNaam] = useState('')
+  const [editOmschrijving, setEditOmschrijving] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
 
   useEffect(() => {
     setUrgentie(getCurrentUrgentie(card))
+    setEditMode(false)
+    setEditNaam(card?.name ?? '')
+    setEditOmschrijving(card?.desc ?? '')
     // Zet due date input: datetime-local verwacht "YYYY-MM-DDTHH:mm"
     if (card?.due) {
       const d = new Date(card.due)
@@ -475,6 +490,30 @@ function CardDetailModal({
     }
   }
 
+  const handleSaveEdit = async () => {
+    if (!card || savingEdit || !editNaam.trim()) return
+    setSavingEdit(true)
+    try {
+      const res = await fetch('/api/trello/card', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cardId: card.id,
+          name: editNaam.trim(),
+          desc: editOmschrijving.trim(),
+        }),
+      })
+      if (res.ok) {
+        onCardUpdated?.(card.id, { name: editNaam.trim(), desc: editOmschrijving.trim() })
+        setEditMode(false)
+      }
+    } catch (err) {
+      console.error('Bewerken mislukt:', err)
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   useEffect(() => {
     if (!card || !open) {
       setComments([])
@@ -533,8 +572,61 @@ function CardDetailModal({
   if (!card) return null
 
   return (
-    <Modal open={open} onClose={onClose} title={card.name}>
+    <Modal open={open} onClose={onClose} title={editMode ? 'Taak bewerken' : card.name}>
       <div className="space-y-4">
+
+        {/* Bewerk-modus */}
+        {editMode ? (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Naam</label>
+              <input
+                type="text"
+                value={editNaam}
+                onChange={(e) => setEditNaam(e.target.value)}
+                className="w-full text-sm rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59]"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Omschrijving</label>
+              <textarea
+                value={editOmschrijving}
+                onChange={(e) => setEditOmschrijving(e.target.value)}
+                rows={4}
+                className="w-full text-sm rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4A7C59]/30 focus:border-[#4A7C59] resize-none"
+                placeholder="Optionele beschrijving..."
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveEdit}
+                disabled={savingEdit || !editNaam.trim()}
+                className="flex-1 px-4 py-2 rounded-lg bg-[#4A7C59] text-white text-sm font-semibold hover:bg-[#3d6a4a] disabled:opacity-40 transition-colors"
+              >
+                {savingEdit ? 'Opslaan...' : 'Opslaan'}
+              </button>
+              <button
+                onClick={() => { setEditMode(false); setEditNaam(card.name); setEditOmschrijving(card.desc) }}
+                className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Annuleren
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Bewerkknop bovenaan (normale modus) */
+          <button
+            onClick={() => setEditMode(true)}
+            className="flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-[#4A7C59] transition-colors"
+          >
+            <Pencil size={14} />
+            Bewerken
+          </button>
+        )}
+
+        {!editMode && <>
+
         {/* Urgentie selector */}
         <div>
           <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Urgentie</h3>
@@ -603,16 +695,17 @@ function CardDetailModal({
           </div>
         </div>
 
-        {card.members && card.members.length > 0 && (
+        {card.aangemaakt_door_naam && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">Leden</h3>
-            <div className="flex flex-wrap gap-2">
-              {card.members.map((member) => (
-                <div key={member.id} className="flex items-center gap-1.5">
-                  <MemberAvatar member={member} />
-                  <span className="text-sm text-[#6B7280]">{member.fullName}</span>
-                </div>
-              ))}
+            <h3 className="text-sm font-semibold text-gray-700 mb-1.5">Aangemaakt door</h3>
+            <div className="flex items-center gap-2">
+              <span
+                className="flex items-center justify-center w-7 h-7 rounded-full text-white text-xs font-bold flex-shrink-0"
+                style={{ backgroundColor: card.aangemaakt_door_kleur ?? '#4A7C59' }}
+              >
+                {card.aangemaakt_door_naam.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
+              </span>
+              <span className="text-sm text-gray-700">{card.aangemaakt_door_naam}</span>
             </div>
           </div>
         )}
@@ -654,14 +747,22 @@ function CardDetailModal({
           ) : comments.length > 0 ? (
             <div className="space-y-3 max-h-60 overflow-y-auto">
               {comments.map((c) => (
-                <div key={c.id} className="bg-gray-50 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-gray-700">{c.memberCreator}</span>
-                    <span className="text-xs text-[#6B7280]">
-                      {formatDistanceToNow(new Date(c.date), { addSuffix: true, locale: nl })}
-                    </span>
+                <div key={c.id} className="flex gap-2.5">
+                  <span
+                    className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full text-white text-xs font-bold mt-0.5"
+                    style={{ backgroundColor: c.kleur ?? '#4A7C59' }}
+                  >
+                    {c.memberCreator.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </span>
+                  <div className="flex-1 bg-gray-50 rounded-lg p-2.5">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-gray-700">{c.memberCreator}</span>
+                      <span className="text-xs text-[#6B7280]">
+                        {formatDistanceToNow(new Date(c.date), { addSuffix: true, locale: nl })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 whitespace-pre-wrap">{c.text}</p>
                   </div>
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{c.text}</p>
                 </div>
               ))}
             </div>
@@ -712,6 +813,8 @@ function CardDetailModal({
             )}
           </div>
         </div>
+
+        </>}
       </div>
     </Modal>
   )
@@ -1188,6 +1291,15 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: Tr
         isKlaar={selectedCard ? selectedCard.idList === klaarListId : false}
         onMarkeerKlaar={(cardId) => {
           handleMarkeerKlaar(cardId)
+        }}
+        onCardUpdated={(cardId, updates) => {
+          setLists((prev) =>
+            prev.map((list) => ({
+              ...list,
+              cards: list.cards.map((c) => c.id === cardId ? { ...c, ...updates } : c),
+            }))
+          )
+          setSelectedCard((prev) => prev?.id === cardId ? { ...prev, ...updates } : prev)
         }}
         onArchived={(cardId) => {
           setLists((prev) =>

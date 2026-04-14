@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,8 @@ interface TrelloCard {
   url: string
   desc: string
   members?: TrelloMember[]
+  aangemaakt_door_naam?: string
+  aangemaakt_door_kleur?: string
 }
 
 interface TrelloList {
@@ -148,6 +151,30 @@ export async function GET() {
         cardsByList[card.idList] = []
       }
       cardsByList[card.idList].push(card)
+    }
+
+    // Haal maker-info op uit Supabase voor alle kaarten
+    const allCardIds = rawCards.map((c) => c.id)
+    const makerMap: Record<string, { naam: string; kleur: string }> = {}
+    if (allCardIds.length > 0) {
+      const adminClient = createAdminClient()
+      const { data: kaarten } = await adminClient
+        .from('trello_kaarten')
+        .select('trello_card_id, profiles:aangemaakt_door ( naam, kleur )')
+        .in('trello_card_id', allCardIds)
+
+      for (const k of kaarten ?? []) {
+        const p = k.profiles as unknown as { naam: string; kleur: string } | null
+        if (p) makerMap[k.trello_card_id] = { naam: p.naam, kleur: p.kleur }
+      }
+    }
+
+    // Voeg maker-info toe aan elke kaart
+    for (const card of rawCards) {
+      if (makerMap[card.id]) {
+        card.aangemaakt_door_naam = makerMap[card.id].naam
+        card.aangemaakt_door_kleur = makerMap[card.id].kleur
+      }
     }
 
     // Combine into final structure — filter out "Archief" list (case-insensitive)

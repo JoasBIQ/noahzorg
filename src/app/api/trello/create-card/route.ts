@@ -133,6 +133,16 @@ export async function POST(request: NextRequest) {
     }
 
     const card = await res.json()
+
+    // Sla de koppeling maker ↔ kaart op in Supabase
+    const adminClient = createAdminClient()
+    await adminClient
+      .from('trello_kaarten')
+      .insert({ trello_card_id: card.id, aangemaakt_door: user.id })
+      .then(({ error }) => {
+        if (error) console.error('[Trello] Kaart opslaan in supabase mislukt:', error)
+      })
+
     return NextResponse.json({ success: true, card })
   } catch (error) {
     console.error('Trello create card error:', error)
