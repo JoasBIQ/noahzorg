@@ -11,10 +11,17 @@ import { Modal } from '@/components/ui/modal'
 import { format, isPast, formatDistanceToNow, differenceInDays } from 'date-fns'
 import { nl } from 'date-fns/locale'
 
+interface AppProfile {
+  id: string
+  naam: string
+  kleur: string
+}
+
 interface TrelloBoardProps {
   currentUserId: string
   isBeheerder: boolean
   initialTaakTekst?: string
+  allProfiles?: AppProfile[]
 }
 
 interface TrelloLabel {
@@ -41,6 +48,9 @@ interface TrelloCard {
   members?: TrelloMember[]
   aangemaakt_door_naam?: string
   aangemaakt_door_kleur?: string
+  toegewezen_aan_id?: string | null
+  toegewezen_aan_naam?: string | null
+  toegewezen_aan_kleur?: string | null
 }
 
 interface TrelloList {
@@ -203,15 +213,26 @@ function TrelloCardItem({
               )}
             </div>
 
-            {card.aangemaakt_door_naam && (
-              <span
-                className="flex-shrink-0 text-xs font-medium px-1.5 py-0.5 rounded-full text-white"
-                style={{ backgroundColor: card.aangemaakt_door_kleur ?? '#4A7C59' }}
-                title={`Aangemaakt door ${card.aangemaakt_door_naam}`}
-              >
-                {card.aangemaakt_door_naam.split(' ')[0]}
-              </span>
-            )}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {card.toegewezen_aan_naam && (
+                <span
+                  className="flex items-center justify-center w-6 h-6 rounded-full text-white text-[10px] font-bold flex-shrink-0"
+                  style={{ backgroundColor: card.toegewezen_aan_kleur ?? '#6B7280' }}
+                  title={`Toegewezen aan ${card.toegewezen_aan_naam}`}
+                >
+                  {card.toegewezen_aan_naam.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                </span>
+              )}
+              {card.aangemaakt_door_naam && !card.toegewezen_aan_naam && (
+                <span
+                  className="flex-shrink-0 text-xs font-medium px-1.5 py-0.5 rounded-full text-white opacity-60"
+                  style={{ backgroundColor: card.aangemaakt_door_kleur ?? '#4A7C59' }}
+                  title={`Aangemaakt door ${card.aangemaakt_door_naam}`}
+                >
+                  {card.aangemaakt_door_naam.split(' ')[0]}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -371,6 +392,7 @@ function CardDetailModal({
   klaarListId,
   isKlaar,
   isBeheerder,
+  allProfiles,
 }: {
   card: TrelloCard | null
   open: boolean
@@ -383,6 +405,7 @@ function CardDetailModal({
   klaarListId?: string | null
   isKlaar?: boolean
   isBeheerder?: boolean
+  allProfiles?: AppProfile[]
 }) {
   const [comments, setComments] = useState<TrelloComment[]>([])
   const [loadingComments, setLoadingComments] = useState(false)
@@ -399,12 +422,16 @@ function CardDetailModal({
   const [editNaam, setEditNaam] = useState('')
   const [editOmschrijving, setEditOmschrijving] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
+  // Toewijzing
+  const [toewijzing, setToewijzing] = useState<string>('')
+  const [savingToewijzing, setSavingToewijzing] = useState(false)
 
   useEffect(() => {
     setUrgentie(getCurrentUrgentie(card))
     setEditMode(false)
     setEditNaam(card?.name ?? '')
     setEditOmschrijving(card?.desc ?? '')
+    setToewijzing(card?.toegewezen_aan_id ?? '')
     // Zet due date input: datetime-local verwacht "YYYY-MM-DDTHH:mm"
     if (card?.due) {
       const d = new Date(card.due)
@@ -487,6 +514,29 @@ function CardDetailModal({
       console.error('Markeren als klaar mislukt:', err)
     } finally {
       setMarkingKlaar(false)
+    }
+  }
+
+  const handleToewijzingChange = async (profielId: string) => {
+    if (!card || savingToewijzing) return
+    setToewijzing(profielId)
+    setSavingToewijzing(true)
+    try {
+      await fetch('/api/trello/toewijzing', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId: card.id, toegewezenAan: profielId || null }),
+      })
+      const profiel = allProfiles?.find((p) => p.id === profielId) ?? null
+      onCardUpdated?.(card.id, {
+        toegewezen_aan_id: profiel?.id ?? null,
+        toegewezen_aan_naam: profiel?.naam ?? null,
+        toegewezen_aan_kleur: profiel?.kleur ?? null,
+      })
+    } catch (err) {
+      console.error('Toewijzing opslaan mislukt:', err)
+    } finally {
+      setSavingToewijzing(false)
     }
   }
 
@@ -710,6 +760,48 @@ function CardDetailModal({
           </div>
         )}
 
+        {/* Toewijzen aan persoon */}
+        {allProfiles && allProfiles.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Toegewezen aan</h3>
+            <div className="flex flex-wrap gap-2">
+              {/* Optie: niemand */}
+              <button
+                onClick={() => handleToewijzingChange('')}
+                disabled={savingToewijzing}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors disabled:opacity-50 ${
+                  !toewijzing
+                    ? 'bg-gray-200 border-gray-300 text-gray-700'
+                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                Niemand
+              </button>
+              {allProfiles.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => handleToewijzingChange(p.id)}
+                  disabled={savingToewijzing}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-colors disabled:opacity-50 ${
+                    toewijzing === p.id
+                      ? 'border-transparent text-white'
+                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                  style={toewijzing === p.id ? { backgroundColor: p.kleur } : {}}
+                >
+                  <span
+                    className="flex items-center justify-center w-4 h-4 rounded-full text-white text-[9px] font-bold flex-shrink-0"
+                    style={{ backgroundColor: toewijzing === p.id ? 'rgba(255,255,255,0.3)' : p.kleur }}
+                  >
+                    {p.naam.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </span>
+                  {p.naam.split(' ')[0]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Notities / Comments */}
         <div className="border-t border-gray-100 pt-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
@@ -917,7 +1009,7 @@ function InlineAddCard({
   )
 }
 
-export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: TrelloBoardProps) {
+export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst, allProfiles = [] }: TrelloBoardProps) {
   const [lists, setLists] = useState<TrelloList[]>([])
   const [boardUrl, setBoardUrl] = useState('')
   const [loading, setLoading] = useState(true)
@@ -1292,6 +1384,7 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst }: Tr
         onMarkeerKlaar={(cardId) => {
           handleMarkeerKlaar(cardId)
         }}
+        allProfiles={allProfiles}
         onCardUpdated={(cardId, updates) => {
           setLists((prev) =>
             prev.map((list) => ({

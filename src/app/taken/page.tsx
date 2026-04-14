@@ -19,14 +19,14 @@ export default async function TakenRoute({
     redirect('/login')
   }
 
-  // Fetch current user profile
-  const { data: currentProfile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  // Haal huidig profiel én alle actieve profielen op (parallel)
+  const [{ data: currentProfile }, { data: alleProfielen }] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('profiles').select('id, naam, kleur').eq('actief', true).order('naam'),
+  ])
 
   const profile = currentProfile as unknown as Profile
+  const profielen = (alleProfielen ?? []) as { id: string; naam: string; kleur: string }[]
 
   return (
     <AppShell>
@@ -34,6 +34,7 @@ export default async function TakenRoute({
         currentUserId={user.id}
         isBeheerder={profile?.rol === 'beheerder'}
         initialTaakTekst={searchParams.maakTaak}
+        allProfiles={profielen}
       />
     </AppShell>
   )

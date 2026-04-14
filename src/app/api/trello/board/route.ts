@@ -28,6 +28,9 @@ interface TrelloCard {
   members?: TrelloMember[]
   aangemaakt_door_naam?: string
   aangemaakt_door_kleur?: string
+  toegewezen_aan_id?: string | null
+  toegewezen_aan_naam?: string | null
+  toegewezen_aan_kleur?: string | null
 }
 
 interface TrelloList {
@@ -153,27 +156,46 @@ export async function GET() {
       cardsByList[card.idList].push(card)
     }
 
-    // Haal maker-info op uit Supabase voor alle kaarten
+    // Haal maker- en toewijzingsinfo op uit Supabase voor alle kaarten
     const allCardIds = rawCards.map((c) => c.id)
     const makerMap: Record<string, { naam: string; kleur: string }> = {}
+    const toegewezenMap: Record<string, { id: string; naam: string; kleur: string }> = {}
     if (allCardIds.length > 0) {
       const adminClient = createAdminClient()
       const { data: kaarten } = await adminClient
         .from('trello_kaarten')
-        .select('trello_card_id, profiles:aangemaakt_door ( naam, kleur )')
+        .select(`
+          trello_card_id,
+          maker:aangemaakt_door ( naam, kleur ),
+          toegewezen:toegewezen_aan ( id, naam, kleur )
+        `)
         .in('trello_card_id', allCardIds)
 
       for (const k of kaarten ?? []) {
-        const p = k.profiles as unknown as { naam: string; kleur: string } | null
-        if (p) makerMap[k.trello_card_id] = { naam: p.naam, kleur: p.kleur }
+        const maker = k.maker as unknown as { naam: string; kleur: string } | null
+        if (maker) makerMap[k.trello_card_id] = { naam: maker.naam, kleur: maker.kleur }
+
+        const toegewezen = k.toegewezen as unknown as { id: string; naam: string; kleur: string } | null
+        if (toegewezen) {
+          toegewezenMap[k.trello_card_id] = {
+            id: toegewezen.id,
+            naam: toegewezen.naam,
+            kleur: toegewezen.kleur,
+          }
+        }
       }
     }
 
-    // Voeg maker-info toe aan elke kaart
+    // Voeg maker- en toewijzingsinfo toe aan elke kaart
     for (const card of rawCards) {
       if (makerMap[card.id]) {
         card.aangemaakt_door_naam = makerMap[card.id].naam
         card.aangemaakt_door_kleur = makerMap[card.id].kleur
+      }
+      if (toegewezenMap[card.id]) {
+        card.toegewezen_aan_id = toegewezenMap[card.id].id
+        card.toegewezen_aan_naam = toegewezenMap[card.id].naam
+        card.toegewezen_aan_kleur = toegewezenMap[card.id].kleur
       }
     }
 
