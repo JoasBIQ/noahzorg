@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LogOut, AlertTriangle, User } from 'lucide-react'
+import { LogOut, AlertTriangle, User, FileText } from 'lucide-react'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { NAV_ITEMS } from '@/lib/constants'
@@ -107,6 +107,24 @@ export function Sidebar() {
             })}
           </ul>
         </nav>
+
+        {/* Exporteer dossier */}
+        <div className="px-3 pb-2">
+          <Link href="/export">
+            <motion.div
+              whileTap={{ scale: 0.95 }}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                pathname === '/export'
+                  ? 'bg-[#4A7C59]/10 text-[#4A7C59]'
+                  : 'text-[#6B7280] hover:bg-gray-100 hover:text-gray-900'
+              )}
+            >
+              <FileText className="h-5 w-5 flex-shrink-0" />
+              <span>Exporteer dossier</span>
+            </motion.div>
+          </Link>
+        </div>
 
         {/* Noodinformatie knop + user + logout */}
         <div className="px-3 pb-4">

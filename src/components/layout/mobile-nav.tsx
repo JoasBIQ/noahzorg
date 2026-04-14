@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState } from 'react'
-import { Grid, MessageSquare, Mail, HardDrive, Users2, X } from 'lucide-react'
+import { Grid, MessageSquare, Mail, HardDrive, Users2, FileText, X } from 'lucide-react'
 import { NAV_ITEMS } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { useProfile } from '@/hooks/use-profile'
@@ -16,6 +16,7 @@ const MEER_ITEMS = [
   { label: 'Mail', href: '/mail', icon: Mail },
   { label: 'Drive', href: '/drive', icon: HardDrive },
   { label: 'Rondom Noah', href: '/team', icon: Users2 },
+  { label: 'Exporteer dossier', href: '/export', icon: FileText },
 ] as const
 
 export function MobileNav() {
