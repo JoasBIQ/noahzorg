@@ -274,6 +274,11 @@ export function MedicatieDossierPDF({
                         {item.werkzame_stof}
                       </Text>
                     )}
+                    {item.indicatie && (
+                      <Text style={[styles.tableCell, { color: GRAY, fontSize: 7, fontStyle: 'italic' }]}>
+                        {item.indicatie}
+                      </Text>
+                    )}
                   </View>
                   <Text style={[styles.tableCell, styles.colDosering]}>{item.dosering ?? '—'}</Text>
                   <Text style={[styles.tableCell, styles.colTijdstip]}>{item.tijdstip ?? '—'}</Text>
