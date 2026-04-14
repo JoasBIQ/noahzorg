@@ -24,7 +24,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
-import { MedicatiesTab } from '@/components/noah/medicaties-tab'
+import { MedicatieDossier } from '@/components/medicaties/medicatie-dossier'
 import { DriveFilePicker } from '@/components/overleggen/drive-file-picker'
 
 interface MedischTabProps {
@@ -617,7 +617,7 @@ export function MedischTab({ currentUserId }: MedischTabProps) {
       {/* 5. Medicatie */}
       <motion.div custom={4} variants={sectionVariants} initial="hidden" animate="visible">
         <div className="border-t border-gray-100 pt-6">
-          <MedicatiesTab currentUserId={currentUserId} />
+          <MedicatieDossier currentUserId={currentUserId} />
         </div>
       </motion.div>
 
