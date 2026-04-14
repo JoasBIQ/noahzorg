@@ -186,6 +186,13 @@ export async function getAuthorizedClient() {
   return client
 }
 
+export interface GmailAttachment {
+  id: string        // attachmentId
+  filename: string
+  mimeType: string
+  size: number      // bytes
+}
+
 export interface GmailMessage {
   id: string
   threadId: string
@@ -197,6 +204,8 @@ export interface GmailMessage {
   body: string
   labelIds: string[]
   gelezen: boolean
+  hasAttachments: boolean
+  attachments: GmailAttachment[]
 }
 
 export async function getMessages(
@@ -265,6 +274,33 @@ export async function getMessages(
         return ''
       }
 
+      // Haal bijlage-metadata op uit het payload
+      function extractAttachments(payload: typeof msg.data.payload): GmailAttachment[] {
+        if (!payload) return []
+        const result: GmailAttachment[] = []
+
+        function walk(part: typeof payload) {
+          if (!part) return
+          // Een part is een bijlage als het een bestandsnaam heeft én een attachmentId
+          if (part.filename && part.filename.length > 0 && part.body?.attachmentId) {
+            result.push({
+              id: part.body.attachmentId,
+              filename: part.filename,
+              mimeType: part.mimeType ?? 'application/octet-stream',
+              size: part.body.size ?? 0,
+            })
+          }
+          if (part.parts) {
+            for (const p of part.parts) walk(p)
+          }
+        }
+
+        walk(payload)
+        return result
+      }
+
+      const attachments = extractAttachments(msg.data.payload)
+
       return {
         id: m.id!,
         threadId: msg.data.threadId ?? '',
@@ -276,6 +312,8 @@ export async function getMessages(
         body: extractBody(msg.data.payload),
         labelIds: msg.data.labelIds ?? [],
         gelezen: false, // wordt per-gebruiker ingevuld door de API route
+        hasAttachments: attachments.length > 0,
+        attachments,
       }
     })
   )

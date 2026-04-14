@@ -19,6 +19,12 @@ import {
   Loader2,
   PenSquare,
   CalendarPlus,
+  Paperclip,
+  Download,
+  ImageIcon,
+  File,
+  FileType2,
+  ZoomIn,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { nl } from 'date-fns/locale'
@@ -27,6 +33,13 @@ import { Avatar } from '@/components/ui/avatar'
 import type { Profile } from '@/types'
 
 type MailTab = 'INBOX' | 'SENT' | 'DRAFT'
+
+interface GmailAttachment {
+  id: string
+  filename: string
+  mimeType: string
+  size: number
+}
 
 interface GmailMessage {
   id: string
@@ -39,6 +52,8 @@ interface GmailMessage {
   body: string
   labelIds: string[]
   gelezen: boolean
+  hasAttachments?: boolean
+  attachments?: GmailAttachment[]
 }
 
 interface MailReactie {
@@ -275,6 +290,132 @@ function cleanTitle(subject: string): string {
     .trim()
 }
 
+// ── Bijlage helpers ───────────────────────────────────────────────────────────
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function AttachmentIcon({ mimeType }: { mimeType: string }) {
+  if (mimeType.startsWith('image/')) return <ImageIcon size={16} className="text-blue-500" />
+  if (mimeType === 'application/pdf') return <FileType2 size={16} className="text-red-500" />
+  if (mimeType.includes('word') || mimeType.includes('document')) return <FileText size={16} className="text-blue-700" />
+  return <File size={16} className="text-gray-400" />
+}
+
+function bijlageUrl(messageId: string, att: GmailAttachment): string {
+  return `/api/gmail/attachment?messageId=${encodeURIComponent(messageId)}&attachmentId=${encodeURIComponent(att.id)}&filename=${encodeURIComponent(att.filename)}&mimeType=${encodeURIComponent(att.mimeType)}`
+}
+
+function AttachmentSection({
+  messageId,
+  attachments,
+}: {
+  messageId: string
+  attachments: GmailAttachment[]
+}) {
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+
+  if (attachments.length === 0) return null
+
+  return (
+    <>
+      {/* Lightbox */}
+      {lightboxSrc && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightboxSrc(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxSrc}
+            alt="Bijlage volledig"
+            className="max-h-full max-w-full rounded-lg shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setLightboxSrc(null)}
+            className="absolute top-4 right-4 rounded-full bg-white/20 p-2 text-white hover:bg-white/30 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+      )}
+
+      <div className="mt-4 border-t border-gray-100 pt-4">
+        <h4 className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-3 flex items-center gap-1.5">
+          <Paperclip size={12} />
+          Bijlages ({attachments.length})
+        </h4>
+        <div className="space-y-2">
+          {attachments.map((att) => {
+            const url = bijlageUrl(messageId, att)
+            const isImage = att.mimeType.startsWith('image/')
+            const isLarge = att.size > 5 * 1024 * 1024
+
+            return (
+              <div
+                key={att.id}
+                className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5"
+              >
+                {/* Thumbnail voor afbeeldingen */}
+                {isImage ? (
+                  <button
+                    onClick={() => setLightboxSrc(url)}
+                    className="flex-shrink-0 h-10 w-10 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 hover:ring-2 hover:ring-[#4A7C59]/50 transition-all"
+                    title="Klik om te vergroten"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={att.filename} className="h-full w-full object-cover" />
+                  </button>
+                ) : (
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white">
+                    <AttachmentIcon mimeType={att.mimeType} />
+                  </div>
+                )}
+
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">{att.filename}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[#6B7280]">{formatBytes(att.size)}</span>
+                    {isLarge && (
+                      <span className="text-xs text-amber-600 font-medium">Groot bestand, laden kan even duren</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {isImage && (
+                    <button
+                      onClick={() => setLightboxSrc(url)}
+                      title="Bekijken"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-[#6B7280] hover:bg-gray-200 hover:text-gray-900 transition-colors"
+                    >
+                      <ZoomIn size={15} />
+                    </button>
+                  )}
+                  <a
+                    href={url}
+                    download={att.filename}
+                    title="Downloaden"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-[#6B7280] hover:bg-[#4A7C59]/10 hover:text-[#4A7C59] transition-colors"
+                  >
+                    <Download size={15} />
+                  </a>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function MailItem({
   message,
   tab,
@@ -500,6 +641,14 @@ function MailItem({
                   Nieuw overleg
                 </span>
               )}
+              {message.hasAttachments && (
+                <span className="flex items-center gap-0.5 text-[#6B7280]" title={`${message.attachments?.length ?? 1} bijlage(s)`}>
+                  <Paperclip size={12} />
+                  {(message.attachments?.length ?? 0) > 1 && (
+                    <span className="text-[10px] font-medium">{message.attachments!.length}</span>
+                  )}
+                </span>
+              )}
               <span className="text-xs text-[#6B7280] mt-0.5">{message.date.slice(0, 16)}</span>
             </div>
           </div>
@@ -529,6 +678,14 @@ function MailItem({
               <div className="mt-4 text-sm text-gray-700 whitespace-pre-wrap max-h-80 overflow-y-auto bg-gray-50 rounded-lg p-3 font-mono text-xs leading-relaxed">
                 {message.body || message.snippet}
               </div>
+
+              {/* Bijlages */}
+              {message.hasAttachments && message.attachments && message.attachments.length > 0 && (
+                <AttachmentSection
+                  messageId={message.id}
+                  attachments={message.attachments}
+                />
+              )}
 
               {/* Acties — alleen bij Inbox */}
               {!isDraft && (
