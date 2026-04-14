@@ -14,6 +14,13 @@ const nextConfig = {
   reactStrictMode: true,
   async headers() {
     return [
+      // HTML-pagina's nooit cachen zodat nieuwe JS-bundels altijd worden geladen
+      {
+        source: '/((?!_next/static|_next/image|icons|images|favicon).*)',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store, must-revalidate' },
+        ],
+      },
       {
         source: '/manifest.json',
         headers: [

@@ -2,8 +2,30 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getAuthorizedClient, GmailTokenExpiredError } from '@/lib/gmail'
 import { google } from 'googleapis'
+import type { gmail_v1 } from 'googleapis'
 
 export const dynamic = 'force-dynamic'
+
+/** Zoek recursief een part met de gegeven bestandsnaam en retourneer de base64url-data */
+function findInlinePartData(
+  part: gmail_v1.Schema$MessagePart | null | undefined,
+  targetFilename: string,
+  targetMimeType: string
+): string | null {
+  if (!part) return null
+  if (
+    part.filename === targetFilename &&
+    part.mimeType === targetMimeType &&
+    part.body?.data
+  ) {
+    return part.body.data
+  }
+  for (const child of part.parts ?? []) {
+    const found = findInlinePartData(child, targetFilename, targetMimeType)
+    if (found) return found
+  }
+  return null
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,12 +35,12 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const messageId = searchParams.get('messageId')
-    const attachmentId = searchParams.get('attachmentId')
+    const attachmentId = searchParams.get('attachmentId') ?? ''
     const filename = searchParams.get('filename') ?? 'bijlage'
     const mimeType = searchParams.get('mimeType') ?? 'application/octet-stream'
 
-    if (!messageId || !attachmentId) {
-      return NextResponse.json({ error: 'messageId en attachmentId zijn verplicht.' }, { status: 400 })
+    if (!messageId) {
+      return NextResponse.json({ error: 'messageId is verplicht.' }, { status: 400 })
     }
 
     const client = await getAuthorizedClient()
@@ -26,20 +48,38 @@ export async function GET(request: NextRequest) {
 
     const gmail = google.gmail({ version: 'v1', auth: client })
 
-    const res = await gmail.users.messages.attachments.get({
-      userId: 'me',
-      messageId,
-      id: attachmentId,
-    })
+    let base64url: string
 
-    const data = res.data.data
-    if (!data) return NextResponse.json({ error: 'Bijlage niet gevonden.' }, { status: 404 })
+    if (attachmentId) {
+      // Grote bijlage — opgeslagen als aparte resource in Gmail
+      const res = await gmail.users.messages.attachments.get({
+        userId: 'me',
+        messageId,
+        id: attachmentId,
+      })
+      if (!res.data.data) {
+        return NextResponse.json({ error: 'Bijlage niet gevonden.' }, { status: 404 })
+      }
+      base64url = res.data.data
+    } else {
+      // Kleine inline bijlage — data zit in de message payload zelf
+      const msg = await gmail.users.messages.get({
+        userId: 'me',
+        id: messageId,
+        format: 'full',
+      })
+      const data = findInlinePartData(msg.data.payload, filename, mimeType)
+      if (!data) {
+        return NextResponse.json({ error: 'Inline bijlage niet gevonden.' }, { status: 404 })
+      }
+      base64url = data
+    }
 
     // Gmail gebruikt base64url (- i.p.v. +, _ i.p.v. /)
-    const base64 = data.replace(/-/g, '+').replace(/_/g, '/')
+    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/')
     const buffer = Buffer.from(base64, 'base64')
 
-    // Stel juiste Content-Disposition in: inline voor afbeeldingen zodat de browser ze kan tonen
+    // Inline voor afbeeldingen zodat de browser ze direct kan tonen
     const isImage = mimeType.startsWith('image/')
     const disposition = isImage
       ? `inline; filename="${encodeURIComponent(filename)}"`

@@ -281,14 +281,17 @@ export async function getMessages(
 
         function walk(part: typeof payload) {
           if (!part) return
-          // Een part is een bijlage als het een bestandsnaam heeft én een attachmentId
-          if (part.filename && part.filename.length > 0 && part.body?.attachmentId) {
-            result.push({
-              id: part.body.attachmentId,
-              filename: part.filename,
-              mimeType: part.mimeType ?? 'application/octet-stream',
-              size: part.body.size ?? 0,
-            })
+          // Een part is een bijlage als het een niet-lege bestandsnaam heeft.
+          // Grote bijlages hebben een attachmentId; kleine zijn inline (body.data).
+          if (part.filename && part.filename.length > 0) {
+            if (part.body?.attachmentId || part.body?.data) {
+              result.push({
+                id: part.body?.attachmentId ?? '',  // leeg bij inline bijlages
+                filename: part.filename,
+                mimeType: part.mimeType ?? 'application/octet-stream',
+                size: part.body?.size ?? 0,
+              })
+            }
           }
           if (part.parts) {
             for (const p of part.parts) walk(p)
