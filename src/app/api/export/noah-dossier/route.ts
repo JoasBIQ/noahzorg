@@ -8,7 +8,9 @@ import { NoahDossierPDF } from '@/lib/noah-pdf'
 import type {
   ExportSecties,
   NoahProfielData,
-  MedicatieData,
+  DiagnoseData,
+  TrajectData,
+  MedicatieDossierExportData,
   ContactData,
   BehandelaarData,
   ZorgplanData,
@@ -27,9 +29,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const secties: ExportSecties = body.secties ?? {
-      wie_is_noah: true, persoonlijk: true, medisch: true,
-      medicatie: true, reanimatie: true, zorgplan: true,
-      noodcontacten: true, dagbesteding: true,
+      wie_is_noah: true, persoonlijk: true, medisch: true, diagnoses: true,
+      reanimatie: true, behandelaars: true, medicatie: true, zorgplan: true,
+      trajecten: true, noodcontacten: true, dagbesteding: true,
     }
 
     const adminClient = createAdminClient()
@@ -37,47 +39,33 @@ export async function POST(request: NextRequest) {
     // ── Data ophalen (parallel) ───────────────────────────────────────────
     const [
       { data: profielRaw },
-      { data: medicatiesRaw },
+      { data: medicatieDossierRaw },
       { data: contactenRaw },
       { data: behandelaarsRaw },
       { data: zorgplanRaw },
       { data: dagbestedingRaw },
+      { data: diagnosesRaw },
+      { data: trajectenRaw },
     ] = await Promise.all([
       adminClient.from('noah_profiel').select('*').limit(1).single(),
-      adminClient
-        .from('medicaties')
-        .select('naam, dosering, frequentie, voorschrijver, notities, status')
-        .eq('gearchiveerd', false)
-        .eq('status', 'actief')
-        .order('naam'),
-      adminClient
-        .from('contacten')
-        .select('naam, functie, organisatie, telefoon, email, is_noodcontact, nood_volgorde')
-        .eq('gearchiveerd', false)
-        .order('nood_volgorde', { ascending: true, nullsFirst: false }),
-      adminClient
-        .from('behandelaars')
-        .select('naam, specialisme, ziekenhuis, telefoon, notities')
-        .eq('gearchiveerd', false)
-        .order('naam'),
-      adminClient
-        .from('zorgplan_afspraken')
-        .select('categorie, titel, omschrijving, wie_doet_het, frequentie')
-        .eq('actief', true)
-        .order('categorie'),
-      adminClient
-        .from('dagbesteding')
-        .select('naam, adres, contactpersoon, telefoon, dagen_tijden, activiteiten, bijzonderheden')
-        .order('naam'),
+      adminClient.from('medicatie_dossier').select('naam, werkzame_stof, indicatie, tijdstip, dosering, voorschrijver').eq('actief', true).order('naam'),
+      adminClient.from('contacten').select('naam, functie, organisatie, telefoon, email, is_noodcontact, nood_volgorde').eq('gearchiveerd', false).order('nood_volgorde', { ascending: true, nullsFirst: false }),
+      adminClient.from('behandelaars').select('naam, specialisme, ziekenhuis, telefoon, notities').eq('gearchiveerd', false).order('naam'),
+      adminClient.from('zorgplan_afspraken').select('categorie, titel, omschrijving, wie_doet_het, frequentie').eq('actief', true).order('categorie'),
+      adminClient.from('dagbesteding').select('naam, adres, contactpersoon, telefoon, dagen_tijden, activiteiten, bijzonderheden').order('naam'),
+      adminClient.from('diagnoses').select('naam, datum_gesteld, gesteld_door, toelichting, onderbouwing, info_link_1, info_link_1_label, info_link_2, info_link_2_label, info_link_3, info_link_3_label').eq('actief', true).order('datum_gesteld'),
+      adminClient.from('trajecten').select('naam_traject, organisatie, contactpersoon, contactpersoon_telefoon, startdatum, notities').eq('status', 'lopend').order('naam_traject'),
     ])
 
     // ── Typen casten ──────────────────────────────────────────────────────
     const profiel = (profielRaw ?? {}) as NoahProfielData
-    const medicaties = (medicatiesRaw ?? []) as MedicatieData[]
+    const medicatieDossier = (medicatieDossierRaw ?? []) as MedicatieDossierExportData[]
     const contacten = (contactenRaw ?? []) as ContactData[]
     const behandelaars = (behandelaarsRaw ?? []) as BehandelaarData[]
     const zorgplan = (zorgplanRaw ?? []) as ZorgplanData[]
     const dagbesteding = (dagbestedingRaw ?? []) as DagbestedingData[]
+    const diagnoses = (diagnosesRaw ?? []) as DiagnoseData[]
+    const trajecten = (trajectenRaw ?? []) as TrajectData[]
 
     const exportDatum = new Date().toLocaleDateString('nl-NL', {
       day: 'numeric', month: 'long', year: 'numeric',
@@ -86,7 +74,7 @@ export async function POST(request: NextRequest) {
     // ── PDF genereren ─────────────────────────────────────────────────────
     const pdfBuffer = await renderToBuffer(
       React.createElement(NoahDossierPDF, {
-        data: { profiel, medicaties, contacten, behandelaars, zorgplan, dagbesteding, secties, exportDatum },
+        data: { profiel, medicatieDossier, contacten, behandelaars, zorgplan, dagbesteding, diagnoses, trajecten, secties, exportDatum },
       }) as React.ReactElement<DocumentProps>
     )
 

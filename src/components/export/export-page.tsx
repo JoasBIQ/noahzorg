@@ -9,22 +9,22 @@ const SECTIES: { key: keyof ExportSecties; label: string; omschrijving: string }
   {
     key: 'wie_is_noah',
     label: 'Wie is Noah',
-    omschrijving: 'Karakter, voorkeuren, communicatie en dagelijks leven',
+    omschrijving: 'Karakter, voorkeuren, communicatie en dagritme',
   },
   {
     key: 'persoonlijk',
     label: 'Persoonlijke gegevens',
-    omschrijving: 'Geboortedatum, woonsituatie, juridisch en financieel',
+    omschrijving: 'Naam en geboortedatum',
   },
   {
     key: 'medisch',
     label: 'Medisch',
-    omschrijving: 'Diagnose, huisarts, behandelaars en zorgkantoor',
+    omschrijving: 'Huisarts, diagnose en zorgkantoor',
   },
   {
-    key: 'medicatie',
-    label: 'Medicatie',
-    omschrijving: 'Actieve medicijnen met dosering en frequentie',
+    key: 'diagnoses',
+    label: 'Diagnoses',
+    omschrijving: 'Alle diagnoses met toelichting en informatiebronnen',
   },
   {
     key: 'reanimatie',
@@ -32,9 +32,24 @@ const SECTIES: { key: keyof ExportSecties; label: string; omschrijving: string }
     omschrijving: 'Het vastgestelde beleid en toelichting',
   },
   {
+    key: 'behandelaars',
+    label: 'Behandelaars',
+    omschrijving: 'Artsen en therapeuten',
+  },
+  {
+    key: 'medicatie',
+    label: 'Actuele medicatie',
+    omschrijving: 'Medicatieschema met tijdstip en dosering',
+  },
+  {
     key: 'zorgplan',
     label: 'Zorgplan',
     omschrijving: 'Actieve zorgplanafspraken per categorie',
+  },
+  {
+    key: 'trajecten',
+    label: 'Trajecten',
+    omschrijving: 'Lopende zorgtrajecten',
   },
   {
     key: 'noodcontacten',
@@ -53,9 +68,12 @@ export function ExportPage() {
     wie_is_noah: true,
     persoonlijk: true,
     medisch: true,
-    medicatie: true,
+    diagnoses: true,
     reanimatie: true,
+    behandelaars: true,
+    medicatie: true,
     zorgplan: true,
+    trajecten: true,
     noodcontacten: true,
     dagbesteding: true,
   })

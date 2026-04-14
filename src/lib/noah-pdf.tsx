@@ -44,12 +44,36 @@ export interface NoahProfielData {
   medicatielijst_tekst?: string | null
 }
 
-export interface MedicatieData {
+export interface DiagnoseData {
   naam: string
-  dosering?: string | null
-  frequentie?: string | null
-  voorschrijver?: string | null
+  datum_gesteld?: string | null
+  gesteld_door?: string | null
+  toelichting?: string | null
+  onderbouwing?: string | null
+  info_link_1?: string | null
+  info_link_1_label?: string | null
+  info_link_2?: string | null
+  info_link_2_label?: string | null
+  info_link_3?: string | null
+  info_link_3_label?: string | null
+}
+
+export interface TrajectData {
+  naam_traject: string
+  organisatie?: string | null
+  contactpersoon?: string | null
+  contactpersoon_telefoon?: string | null
+  startdatum?: string | null
   notities?: string | null
+}
+
+export interface MedicatieDossierExportData {
+  naam: string
+  werkzame_stof?: string | null
+  indicatie?: string | null
+  tijdstip?: string | null
+  dosering?: string | null
+  voorschrijver?: string | null
 }
 
 export interface ContactData {
@@ -88,26 +112,31 @@ export interface DagbestedingData {
   bijzonderheden?: string | null
 }
 
-export interface NoahDossierData {
-  profiel: NoahProfielData
-  medicaties: MedicatieData[]
-  contacten: ContactData[]
-  behandelaars: BehandelaarData[]
-  zorgplan: ZorgplanData[]
-  dagbesteding: DagbestedingData[]
-  secties: ExportSecties
-  exportDatum: string
-}
-
 export interface ExportSecties {
   wie_is_noah: boolean
   persoonlijk: boolean
   medisch: boolean
-  medicatie: boolean
+  diagnoses: boolean
   reanimatie: boolean
+  behandelaars: boolean
+  medicatie: boolean
   zorgplan: boolean
+  trajecten: boolean
   noodcontacten: boolean
   dagbesteding: boolean
+}
+
+export interface NoahDossierData {
+  profiel: NoahProfielData
+  medicatieDossier: MedicatieDossierExportData[]
+  contacten: ContactData[]
+  behandelaars: BehandelaarData[]
+  zorgplan: ZorgplanData[]
+  dagbesteding: DagbestedingData[]
+  diagnoses: DiagnoseData[]
+  trajecten: TrajectData[]
+  secties: ExportSecties
+  exportDatum: string
 }
 
 // ── Kleuren & stijlen ─────────────────────────────────────────────────────────
@@ -298,10 +327,12 @@ function PageHeader({ naam, datum }: { naam: string; datum: string }) {
   )
 }
 
-function PageFooter() {
+function PageFooter({ exportDatum }: { exportDatum: string }) {
   return (
     <View style={styles.footer} fixed>
-      <Text style={styles.footerText}>Vertrouwelijk — uitsluitend bestemd voor zorgdoeleinden</Text>
+      <Text style={styles.footerText}>
+        Vertrouwelijk — uitsluitend bestemd voor zorgdoeleinden{'   '}{exportDatum}
+      </Text>
       <Text
         style={styles.footerText}
         render={({ pageNumber, totalPages }) => `Pagina ${pageNumber} van ${totalPages}`}
@@ -310,14 +341,40 @@ function PageFooter() {
   )
 }
 
+// ── Medicatie groepering ──────────────────────────────────────────────────────
+
+const TIJDSTIP_VOLGORDE = ['Ochtend', 'Lunch', 'Uur voor bedtijd', 'Bedtijd', 'Zo nodig', 'Dagelijks', 'Anders']
+
+function groepeerMedicatie(items: MedicatieDossierExportData[]) {
+  const map = new Map<string, {
+    naam: string; werkzame_stof: string | null; indicatie: string | null
+    tijdstippen: { tijdstip: string | null; dosering: string | null }[]
+    voorschrijver: string | null
+  }>()
+  for (const item of items) {
+    const key = item.naam.toLowerCase().trim()
+    if (!map.has(key)) map.set(key, { naam: item.naam, werkzame_stof: item.werkzame_stof ?? null, indicatie: item.indicatie ?? null, tijdstippen: [], voorschrijver: item.voorschrijver ?? null })
+    map.get(key)!.tijdstippen.push({ tijdstip: item.tijdstip ?? null, dosering: item.dosering ?? null })
+  }
+  return Array.from(map.values()).map(g => ({
+    ...g,
+    tijdstippen: g.tijdstippen.sort((a, b) => {
+      const ai = TIJDSTIP_VOLGORDE.indexOf(a.tijdstip ?? 'Anders')
+      const bi = TIJDSTIP_VOLGORDE.indexOf(b.tijdstip ?? 'Anders')
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+    })
+  }))
+}
+
 // ── PDF Document ──────────────────────────────────────────────────────────────
 
 export function NoahDossierPDF({ data }: { data: NoahDossierData }) {
-  const { profiel, medicaties, contacten, behandelaars, zorgplan, dagbesteding, secties, exportDatum } = data
+  const { profiel, medicatieDossier, contacten, behandelaars, zorgplan, dagbesteding, diagnoses, trajecten, secties, exportDatum } = data
   const naam = profiel.volledige_naam ?? 'Noah'
   const noodcontacten = contacten
     .filter((c) => c.is_noodcontact)
     .sort((a, b) => (a.nood_volgorde ?? 99) - (b.nood_volgorde ?? 99))
+  const groepen = groepeerMedicatie(medicatieDossier)
 
   return (
     <Document title={`Zorgprofiel ${naam}`} author="Rondom Noah" subject="Zorgdossier">
@@ -338,14 +395,14 @@ export function NoahDossierPDF({ data }: { data: NoahDossierData }) {
           <Text style={styles.voorbladDatumLabel}>Datum van export</Text>
           <Text style={styles.voorbladDatum}>{exportDatum}</Text>
         </View>
-        <PageFooter />
+        <PageFooter exportDatum={exportDatum} />
       </Page>
 
-      {/* ── Inhoudspagina's ─────────────────────────────────────────────── */}
+      {/* ── Inhoudspagina (enkelvoudig, auto-wrap) ──────────────────────── */}
       <Page size="A4" style={styles.page}>
         <PageHeader naam={naam} datum={exportDatum} />
 
-        {/* Wie is Noah */}
+        {/* 1. Wie is Noah */}
         {secties.wie_is_noah && (
           <View style={styles.sectieContainer}>
             <Text style={styles.sectieKop}>Wie is {naam}?</Text>
@@ -398,47 +455,19 @@ export function NoahDossierPDF({ data }: { data: NoahDossierData }) {
           </View>
         )}
 
-        {/* Persoonlijke gegevens */}
+        {/* 2. Persoonlijke gegevens */}
         {secties.persoonlijk && (
           <View style={styles.sectieContainer}>
             <Text style={styles.sectieKop}>Persoonlijke gegevens</Text>
             <Rij label="Volledige naam" waarde={profiel.volledige_naam} />
             <Rij label="Geboortedatum" waarde={formatDatum(profiel.geboortedatum)} />
-            {profiel.wonen_huidig && <Rij label="Huidige woonsituatie" waarde={profiel.wonen_huidig} />}
-            {profiel.juridisch_notities && (
-              <>
-                <Text style={styles.subKop}>Juridisch</Text>
-                <Text style={styles.bodyTekst}>{profiel.juridisch_notities}</Text>
-              </>
-            )}
-            {profiel.financieel_notities && (
-              <>
-                <Text style={styles.subKop}>Financieel</Text>
-                <Text style={styles.bodyTekst}>{profiel.financieel_notities}</Text>
-              </>
-            )}
           </View>
         )}
 
-        <PageFooter />
-      </Page>
-
-      <Page size="A4" style={styles.page}>
-        <PageHeader naam={naam} datum={exportDatum} />
-
-        {/* Medisch */}
+        {/* 3. Medisch */}
         {secties.medisch && (
           <View style={styles.sectieContainer}>
             <Text style={styles.sectieKop}>Medisch</Text>
-
-            {profiel.diagnose && (
-              <>
-                <Text style={styles.subKop}>Diagnose</Text>
-                <View style={styles.infoBlok}>
-                  <Text style={styles.infoBlokTekst}>{profiel.diagnose}</Text>
-                </View>
-              </>
-            )}
 
             {(profiel.huisarts_naam || profiel.huisarts_praktijk || profiel.huisarts_telefoon) && (
               <>
@@ -457,70 +486,41 @@ export function NoahDossierPDF({ data }: { data: NoahDossierData }) {
               </>
             )}
 
-            {behandelaars.length > 0 && (
-              <>
-                <Text style={styles.subKop}>Behandelaars & specialisten</Text>
-                <View style={styles.tabel}>
-                  <View style={styles.tabelKopRij}>
-                    <Text style={[styles.tabelKopTekst, { flex: 2 }]}>Naam</Text>
-                    <Text style={[styles.tabelKopTekst, { flex: 2 }]}>Specialisme / Ziekenhuis</Text>
-                    <Text style={[styles.tabelKopTekst, { flex: 1.5 }]}>Telefoon</Text>
-                  </View>
-                  {behandelaars.map((b, i) => (
-                    <View key={i} style={[styles.tabelRij, i % 2 === 1 ? styles.tabelRijAlt : {}]}>
-                      <Text style={[styles.tabelCel, { flex: 2 }]}>{b.naam}</Text>
-                      <Text style={[styles.tabelCelGrijs, { flex: 2 }]}>
-                        {[b.specialisme, b.ziekenhuis].filter(Boolean).join(' — ') || '—'}
-                      </Text>
-                      <Text style={[styles.tabelCelGrijs, { flex: 1.5 }]}>{b.telefoon ?? '—'}</Text>
-                    </View>
-                  ))}
-                </View>
-              </>
+            {!profiel.huisarts_naam && !profiel.zorgkantoor && (
+              <Lege label="Medische gegevens" />
             )}
           </View>
         )}
 
-        {/* Medicatie */}
-        {secties.medicatie && (
+        {/* 4. Diagnoses */}
+        {secties.diagnoses && diagnoses.length > 0 && (
           <View style={styles.sectieContainer}>
-            <Text style={styles.sectieKop}>Medicatie</Text>
-            {medicaties.length > 0 ? (
-              <View style={styles.tabel}>
-                <View style={styles.tabelKopRij}>
-                  <Text style={[styles.tabelKopTekst, { flex: 2 }]}>Medicijn</Text>
-                  <Text style={[styles.tabelKopTekst, { flex: 1.5 }]}>Dosering</Text>
-                  <Text style={[styles.tabelKopTekst, { flex: 1.5 }]}>Frequentie</Text>
-                  <Text style={[styles.tabelKopTekst, { flex: 1.5 }]}>Voorschrijver</Text>
-                </View>
-                {medicaties.map((m, i) => (
-                  <View key={i} style={[styles.tabelRij, i % 2 === 1 ? styles.tabelRijAlt : {}]}>
-                    <Text style={[styles.tabelCel, { flex: 2 }]}>{m.naam}</Text>
-                    <Text style={[styles.tabelCelGrijs, { flex: 1.5 }]}>{m.dosering ?? '—'}</Text>
-                    <Text style={[styles.tabelCelGrijs, { flex: 1.5 }]}>{m.frequentie ?? '—'}</Text>
-                    <Text style={[styles.tabelCelGrijs, { flex: 1.5 }]}>{m.voorschrijver ?? '—'}</Text>
-                  </View>
+            <Text style={styles.sectieKop}>Diagnoses</Text>
+            {diagnoses.map((d, i) => (
+              <View key={i} style={{ marginBottom: 10 }}>
+                <Text style={[styles.subKop, { marginTop: i === 0 ? 0 : 8 }]}>{d.naam}</Text>
+                {d.toelichting ? (
+                  <Text style={styles.bodyTekst}>{d.toelichting}</Text>
+                ) : null}
+                {d.onderbouwing ? (
+                  <>
+                    <Text style={styles.subKop}>Onderbouwing</Text>
+                    <Text style={styles.bodyTekst}>{d.onderbouwing}</Text>
+                  </>
+                ) : null}
+                {[
+                  d.info_link_1 ? (d.info_link_1_label || d.info_link_1) : null,
+                  d.info_link_2 ? (d.info_link_2_label || d.info_link_2) : null,
+                  d.info_link_3 ? (d.info_link_3_label || d.info_link_3) : null,
+                ].filter(Boolean).map((label, j) => (
+                  <Text key={j} style={[styles.tabelCelGrijs, { marginBottom: 2 }]}>• {label}</Text>
                 ))}
               </View>
-            ) : (
-              <Lege label="Actieve medicatie" />
-            )}
-            {profiel.medicatielijst_tekst && (
-              <>
-                <Text style={styles.subKop}>Aanvullende medicatie-informatie</Text>
-                <Text style={styles.bodyTekst}>{profiel.medicatielijst_tekst}</Text>
-              </>
-            )}
+            ))}
           </View>
         )}
 
-        <PageFooter />
-      </Page>
-
-      <Page size="A4" style={styles.page}>
-        <PageHeader naam={naam} datum={exportDatum} />
-
-        {/* Reanimatiebeleid */}
+        {/* 5. Reanimatiebeleid */}
         {secties.reanimatie && (
           <View style={styles.sectieContainer}>
             <Text style={styles.sectieKop}>Reanimatiebeleid</Text>
@@ -548,7 +548,64 @@ export function NoahDossierPDF({ data }: { data: NoahDossierData }) {
           </View>
         )}
 
-        {/* Zorgplan */}
+        {/* 6. Behandelaars */}
+        {secties.behandelaars && behandelaars.length > 0 && (
+          <View style={styles.sectieContainer}>
+            <Text style={styles.sectieKop}>Behandelaars</Text>
+            <View style={styles.tabel}>
+              <View style={styles.tabelKopRij}>
+                <Text style={[styles.tabelKopTekst, { flex: 2 }]}>Naam</Text>
+                <Text style={[styles.tabelKopTekst, { flex: 2 }]}>Specialisme</Text>
+                <Text style={[styles.tabelKopTekst, { flex: 2 }]}>Ziekenhuis</Text>
+                <Text style={[styles.tabelKopTekst, { flex: 1.5 }]}>Telefoon</Text>
+              </View>
+              {behandelaars.map((b, i) => (
+                <View key={i} style={[styles.tabelRij, i % 2 === 1 ? styles.tabelRijAlt : {}]}>
+                  <Text style={[styles.tabelCel, { flex: 2 }]}>{b.naam}</Text>
+                  <Text style={[styles.tabelCelGrijs, { flex: 2 }]}>{b.specialisme ?? '—'}</Text>
+                  <Text style={[styles.tabelCelGrijs, { flex: 2 }]}>{b.ziekenhuis ?? '—'}</Text>
+                  <Text style={[styles.tabelCelGrijs, { flex: 1.5 }]}>{b.telefoon ?? '—'}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* 7. Actuele medicatie */}
+        {secties.medicatie && (
+          <View style={styles.sectieContainer}>
+            <Text style={styles.sectieKop}>Actuele medicatie</Text>
+            {groepen.length > 0 ? (
+              <View style={styles.tabel}>
+                <View style={styles.tabelKopRij}>
+                  <Text style={[styles.tabelKopTekst, { flex: 2.2 }]}>Naam (werkzame stof)</Text>
+                  <Text style={[styles.tabelKopTekst, { flex: 1.8 }]}>Indicatie</Text>
+                  <Text style={[styles.tabelKopTekst, { flex: 2 }]}>Tijdstip &amp; dosering</Text>
+                  <Text style={[styles.tabelKopTekst, { flex: 1.5 }]}>Voorschrijver</Text>
+                </View>
+                {groepen.map((g, i) => (
+                  <View key={i} style={[styles.tabelRij, i % 2 === 1 ? styles.tabelRijAlt : {}]}>
+                    <View style={{ flex: 2.2 }}>
+                      <Text style={styles.tabelCel}>{g.naam}</Text>
+                      {g.werkzame_stof && <Text style={[styles.tabelCelGrijs, {fontSize: 7.5}]}>{g.werkzame_stof}</Text>}
+                    </View>
+                    <Text style={[styles.tabelCelGrijs, { flex: 1.8 }]}>{g.indicatie ?? '—'}</Text>
+                    <View style={{ flex: 2 }}>
+                      {g.tijdstippen.map((t, j) => (
+                        <Text key={j} style={styles.tabelCelGrijs}>{[t.tijdstip, t.dosering].filter(Boolean).join(': ')}</Text>
+                      ))}
+                    </View>
+                    <Text style={[styles.tabelCelGrijs, { flex: 1.5 }]}>{g.voorschrijver ?? '—'}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Lege label="Actieve medicatie" />
+            )}
+          </View>
+        )}
+
+        {/* 8. Zorgplan */}
         {secties.zorgplan && (
           <View style={styles.sectieContainer}>
             <Text style={styles.sectieKop}>Zorgplan</Text>
@@ -578,13 +635,32 @@ export function NoahDossierPDF({ data }: { data: NoahDossierData }) {
           </View>
         )}
 
-        <PageFooter />
-      </Page>
+        {/* 9. Trajecten */}
+        {secties.trajecten && trajecten.length > 0 && (
+          <View style={styles.sectieContainer}>
+            <Text style={styles.sectieKop}>Trajecten</Text>
+            <View style={styles.tabel}>
+              <View style={styles.tabelKopRij}>
+                <Text style={[styles.tabelKopTekst, { flex: 2 }]}>Traject</Text>
+                <Text style={[styles.tabelKopTekst, { flex: 2 }]}>Organisatie</Text>
+                <Text style={[styles.tabelKopTekst, { flex: 2 }]}>Contactpersoon</Text>
+                <Text style={[styles.tabelKopTekst, { flex: 1.5 }]}>Telefoon</Text>
+                <Text style={[styles.tabelKopTekst, { flex: 1.5 }]}>Startdatum</Text>
+              </View>
+              {trajecten.map((t, i) => (
+                <View key={i} style={[styles.tabelRij, i % 2 === 1 ? styles.tabelRijAlt : {}]}>
+                  <Text style={[styles.tabelCel, { flex: 2 }]}>{t.naam_traject}</Text>
+                  <Text style={[styles.tabelCelGrijs, { flex: 2 }]}>{t.organisatie ?? '—'}</Text>
+                  <Text style={[styles.tabelCelGrijs, { flex: 2 }]}>{t.contactpersoon ?? '—'}</Text>
+                  <Text style={[styles.tabelCelGrijs, { flex: 1.5 }]}>{t.contactpersoon_telefoon ?? '—'}</Text>
+                  <Text style={[styles.tabelCelGrijs, { flex: 1.5 }]}>{formatDatum(t.startdatum)}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
-      <Page size="A4" style={styles.page}>
-        <PageHeader naam={naam} datum={exportDatum} />
-
-        {/* Noodcontacten */}
+        {/* 10. Noodcontacten */}
         {secties.noodcontacten && (
           <View style={styles.sectieContainer}>
             <Text style={styles.sectieKop}>Noodcontacten</Text>
@@ -613,7 +689,7 @@ export function NoahDossierPDF({ data }: { data: NoahDossierData }) {
           </View>
         )}
 
-        {/* Dagbesteding */}
+        {/* 11. Dagbesteding */}
         {secties.dagbesteding && dagbesteding.length > 0 && (
           <View style={styles.sectieContainer}>
             <Text style={styles.sectieKop}>Dagbesteding</Text>
@@ -637,9 +713,12 @@ export function NoahDossierPDF({ data }: { data: NoahDossierData }) {
           </View>
         )}
 
-        <PageFooter />
+        <PageFooter exportDatum={exportDatum} />
       </Page>
 
     </Document>
   )
 }
+
+// Keep Font import to avoid unused import errors during build
+void Font

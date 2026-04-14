@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import Image from 'next/image'
 import {
   Pencil,
   Check,
@@ -26,6 +25,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
 import { MedicatieDossier } from '@/components/medicaties/medicatie-dossier'
 import { DriveFilePicker } from '@/components/overleggen/drive-file-picker'
+import { DiagnosesSectie } from '@/components/noah/diagnoses-sectie'
 
 interface MedischTabProps {
   currentUserId: string
@@ -36,7 +36,6 @@ interface NoahProfiel {
   huisarts_naam: string | null
   huisarts_praktijk: string | null
   huisarts_telefoon: string | null
-  diagnose: string | null
   zorgkantoor: string | null
   zorgkantoor_nummer: string | null
   medicatielijst_tekst: string | null
@@ -61,7 +60,6 @@ const emptyProfiel: NoahProfiel = {
   huisarts_naam: null,
   huisarts_praktijk: null,
   huisarts_telefoon: null,
-  diagnose: null,
   zorgkantoor: null,
   zorgkantoor_nummer: null,
   medicatielijst_tekst: null,
@@ -105,7 +103,6 @@ export function MedischTab({ currentUserId }: MedischTabProps) {
 
   // Edit states per section
   const [editHuisarts, setEditHuisarts] = useState(false)
-  const [editDiagnose, setEditDiagnose] = useState(false)
   const [editZorgkantoor, setEditZorgkantoor] = useState(false)
   const [editMedicatielijst, setEditMedicatielijst] = useState(false)
   const [editReanimatie, setEditReanimatie] = useState(false)
@@ -135,7 +132,6 @@ export function MedischTab({ currentUserId }: MedischTabProps) {
         huisarts_naam: (p.huisarts_naam as string) ?? null,
         huisarts_praktijk: (p.huisarts_praktijk as string) ?? null,
         huisarts_telefoon: (p.huisarts_telefoon as string) ?? null,
-        diagnose: (p.diagnose as string) ?? null,
         zorgkantoor: (p.zorgkantoor as string) ?? null,
         zorgkantoor_nummer: (p.zorgkantoor_nummer as string) ?? null,
         medicatielijst_tekst: (p.medicatielijst_tekst as string) ?? null,
@@ -221,7 +217,6 @@ export function MedischTab({ currentUserId }: MedischTabProps) {
     setDraftProfiel({ ...profiel })
     switch (section) {
       case 'huisarts': setEditHuisarts(false); break
-      case 'diagnose': setEditDiagnose(false); break
       case 'zorgkantoor': setEditZorgkantoor(false); break
       case 'medicatielijst': setEditMedicatielijst(false); break
       case 'reanimatie': setEditReanimatie(false); break
@@ -235,11 +230,6 @@ export function MedischTab({ currentUserId }: MedischTabProps) {
       huisarts_telefoon: draftProfiel.huisarts_telefoon,
     })
     setEditHuisarts(false)
-  }
-
-  const saveDiagnose = async () => {
-    await saveProfiel({ diagnose: draftProfiel.diagnose })
-    setEditDiagnose(false)
   }
 
   const saveZorgkantoor = async () => {
@@ -424,51 +414,10 @@ export function MedischTab({ currentUserId }: MedischTabProps) {
         </Card>
       </motion.div>
 
-      {/* 2. Diagnose */}
+      {/* 2. Diagnoses */}
       <motion.div custom={1} variants={sectionVariants} initial="hidden" animate="visible">
         <Card>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Image src="/icons/icon-192x192.png" alt="" width={18} height={18} className="flex-shrink-0" />
-              <h3 className="font-semibold text-gray-900">Diagnose</h3>
-            </div>
-            {editDiagnose ? (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => cancelEdit('diagnose')}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                >
-                  <X size={16} />
-                </button>
-                <button
-                  onClick={saveDiagnose}
-                  disabled={isSaving}
-                  className="p-1.5 rounded-lg text-[#4A7C59] hover:bg-[#4A7C59]/10 transition-colors"
-                >
-                  <Check size={16} />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => { setDraftProfiel({ ...profiel }); setEditDiagnose(true) }}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-              >
-                <Pencil size={16} />
-              </button>
-            )}
-          </div>
-          {editDiagnose ? (
-            <Textarea
-              label="Diagnose"
-              value={draftProfiel.diagnose ?? ''}
-              onChange={(e) => updateDraft('diagnose', e.target.value)}
-              rows={3}
-            />
-          ) : (
-            <p className="text-sm text-gray-900 whitespace-pre-wrap">
-              {profiel.diagnose || <span className="text-[#6B7280]">Nog niet ingevuld</span>}
-            </p>
-          )}
+          <DiagnosesSectie currentUserId={currentUserId} />
         </Card>
       </motion.div>
 
