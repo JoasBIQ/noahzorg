@@ -14,6 +14,7 @@ export interface GoogleDriveFile {
   webViewLink: string | null
   iconLink: string | null
   parents: string[] | null
+  thumbnailLink: string | null
 }
 
 export async function GET(request: NextRequest) {
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
     const listRes = await drive.files.list({
       q,
       fields:
-        'files(id,name,mimeType,modifiedTime,size,webViewLink,iconLink,parents)',
+        'files(id,name,mimeType,modifiedTime,size,webViewLink,iconLink,parents,thumbnailLink)',
       orderBy: 'folder,name',
       pageSize: 200,
     })
@@ -74,6 +75,7 @@ export async function GET(request: NextRequest) {
       webViewLink: f.webViewLink ?? null,
       iconLink: f.iconLink ?? null,
       parents: f.parents ?? null,
+      thumbnailLink: f.thumbnailLink ?? null,
     }))
 
     // Fetch folder name if we're inside a specific folder
