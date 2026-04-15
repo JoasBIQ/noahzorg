@@ -135,12 +135,14 @@ function TrelloCardItem({
   card,
   isKlaar,
   markingKlaar,
+  canMarkKlaar,
   onMarkeerKlaar,
   onClick,
 }: {
   card: TrelloCard
   isKlaar: boolean
   markingKlaar: boolean
+  canMarkKlaar: boolean
   onMarkeerKlaar: (e: React.MouseEvent) => void
   onClick: () => void
 }) {
@@ -161,13 +163,15 @@ function TrelloCardItem({
       <div className="flex items-start gap-2">
         {/* Afvink-knop */}
         <button
-          onClick={onMarkeerKlaar}
-          disabled={markingKlaar || isKlaar}
-          title={isKlaar ? 'Klaar' : 'Markeer als klaar'}
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); onMarkeerKlaar(e) }}
+          disabled={markingKlaar || isKlaar || !canMarkKlaar}
+          title={isKlaar ? 'Klaar' : canMarkKlaar ? 'Markeer als klaar' : 'Geen "Klaar"-lijst gevonden in Trello'}
           className={`flex-shrink-0 mt-0.5 transition-colors disabled:cursor-default ${
             isKlaar
               ? 'text-green-600'
-              : 'text-gray-300 hover:text-green-500'
+              : canMarkKlaar
+                ? 'text-gray-300 hover:text-green-500'
+                : 'text-gray-200 cursor-not-allowed'
           }`}
         >
           {isKlaar
@@ -1311,6 +1315,7 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst, allP
                                 card={card}
                                 isKlaar={list.id === klaarListId}
                                 markingKlaar={markingKlaarId === card.id}
+                                canMarkKlaar={!!klaarListId}
                                 onMarkeerKlaar={(e) => {
                                   e.stopPropagation()
                                   if (list.id !== klaarListId) handleMarkeerKlaar(card.id)
