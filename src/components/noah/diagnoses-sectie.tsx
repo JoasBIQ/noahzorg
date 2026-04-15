@@ -63,6 +63,7 @@ export function DiagnosesSectie({ currentUserId }: DiagnosesSectieProps) {
   const [editingDiagnose, setEditingDiagnose] = useState<Diagnose | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const supabase = createClient()
 
   const fetchDiagnoses = useCallback(async () => {
@@ -85,11 +86,13 @@ export function DiagnosesSectie({ currentUserId }: DiagnosesSectieProps) {
   const openAdd = () => {
     setEditingDiagnose(null)
     setForm(emptyForm)
+    setSaveError(null)
     setModalOpen(true)
   }
 
   const openEdit = (d: Diagnose) => {
     setEditingDiagnose(d)
+    setSaveError(null)
     setForm({
       naam: d.naam,
       datum_gesteld: d.datum_gesteld ?? '',
@@ -110,13 +113,16 @@ export function DiagnosesSectie({ currentUserId }: DiagnosesSectieProps) {
     setModalOpen(false)
     setEditingDiagnose(null)
     setForm(emptyForm)
+    setSaveError(null)
   }
 
   const saveDiagnose = async () => {
     if (!form.naam.trim()) return
     setIsSaving(true)
+    setSaveError(null)
     try {
-      const payload = {
+      // Gedeeld veld voor zowel insert als update
+      const basePayload = {
         naam: form.naam.trim(),
         datum_gesteld: form.datum_gesteld || null,
         gesteld_door: form.gesteld_door || null,
@@ -128,19 +134,24 @@ export function DiagnosesSectie({ currentUserId }: DiagnosesSectieProps) {
         info_link_2_label: form.info_link_2_label || null,
         info_link_3: form.info_link_3 || null,
         info_link_3_label: form.info_link_3_label || null,
-        aangemaakt_door: currentUserId,
       }
 
       if (editingDiagnose) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('diagnoses')
-          .update(payload as never)
+          .update(basePayload as never)
           .eq('id', editingDiagnose.id)
+          .select()
         if (error) throw error
+        if (!data || (data as unknown[]).length === 0) {
+          throw new Error(
+            'Geen rijen bijgewerkt. Controleer de RLS-policies in Supabase (tabel: diagnoses).'
+          )
+        }
       } else {
         const { error } = await supabase
           .from('diagnoses')
-          .insert(payload as never)
+          .insert({ ...basePayload, actief: true, aangemaakt_door: currentUserId } as never)
         if (error) throw error
       }
 
@@ -148,6 +159,13 @@ export function DiagnosesSectie({ currentUserId }: DiagnosesSectieProps) {
       closeModal()
     } catch (err) {
       console.error('Fout bij opslaan diagnose:', err)
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : 'Opslaan mislukt.'
+      setSaveError(msg)
     } finally {
       setIsSaving(false)
     }
@@ -332,6 +350,11 @@ export function DiagnosesSectie({ currentUserId }: DiagnosesSectieProps) {
               placeholder="Bijv. Kinderneurologie.eu"
             />
           </div>
+          {saveError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+              <p className="text-sm text-red-700">{saveError}</p>
+            </div>
+          )}
           <div className="flex gap-2 pt-2">
             <Button variant="secondary" onClick={closeModal} className="flex-1">
               Annuleren
