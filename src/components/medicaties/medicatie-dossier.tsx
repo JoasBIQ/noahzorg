@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
+import { ContactPicker } from '@/components/ui/contact-picker'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -518,10 +519,11 @@ export function MedicatieDossier({ currentUserId }: MedicatieDossierProps) {
               value={formData.startdatum}
               onChange={(e) => updateField('startdatum', e.target.value)}
             />
-            <Input
+            <ContactPicker
               label="Voorschrijver"
               value={formData.voorschrijver}
-              onChange={(e) => updateField('voorschrijver', e.target.value)}
+              onChange={(v) => updateField('voorschrijver', v)}
+              onContactSelect={(c) => updateField('voorschrijver', c.naam)}
               placeholder="Naam arts"
             />
             <div className="col-span-2">

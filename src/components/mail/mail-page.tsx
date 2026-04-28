@@ -1037,6 +1037,7 @@ export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailE
     DRAFT: [],
   })
   const [loadingTab, setLoadingTab] = useState<MailTab | null>(initialConnected ? 'INBOX' : null)
+  const [loadedTabs, setLoadedTabs] = useState<Set<MailTab>>(new Set())
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const connected = initialConnected
@@ -1084,6 +1085,7 @@ export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailE
         setError(data.error)
       } else {
         setMessagesByTab((prev) => ({ ...prev, [tab]: data.messages ?? [] }))
+        setLoadedTabs((prev) => new Set(prev).add(tab))
       }
     } catch {
       setError('Berichten ophalen mislukt.')
@@ -1186,11 +1188,13 @@ export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailE
     if (e.key === 'Escape') clearSearch()
   }
 
-  // Laad actief tabblad als het nog niet geladen is
+  // Laad actief tabblad — maar alleen als het nog niet geladen is
   useEffect(() => {
     if (!initialConnected) return
-    fetchTab(activeTab)
-  }, [activeTab, initialConnected, fetchTab])
+    if (!loadedTabs.has(activeTab)) {
+      fetchTab(activeTab)
+    }
+  }, [activeTab, initialConnected, fetchTab, loadedTabs])
 
   if (!connected) {
     return (
@@ -1248,7 +1252,7 @@ export function MailPage({ isBeheerder, currentProfile, initialConnected, gmailE
             <span className="hidden sm:inline">Schrijf mail</span>
           </button>
           <button
-            onClick={() => fetchTab(activeTab, true)}
+            onClick={() => { setLoadedTabs(new Set()); fetchTab(activeTab, true) }}
             disabled={refreshing || isLoading}
             className="flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-gray-900 transition-colors px-3 py-2 rounded-lg hover:bg-gray-100 disabled:opacity-50"
           >

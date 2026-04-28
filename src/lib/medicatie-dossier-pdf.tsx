@@ -29,14 +29,80 @@ const LIGHT_GRAY = '#F9FAFB'
 const RED = '#DC2626'
 const ALT_ROW = '#F3F4F6'
 
-const TIJDSTIP_ORDER = ['Ochtend', 'Lunch', 'Uur voor bedtijd', 'Bedtijd', 'Zo nodig', 'Anders']
+const TIJDSTIP_ORDER = [
+  'Ochtend', 'Ontbijt',
+  'Middag', 'Lunch',
+  'Namiddag', 'Avond', 'Avondeten',
+  'Uur voor bedtijd', 'Bedtijd', 'Nacht',
+  'Zo nodig', 'Dagelijks', 'Anders',
+]
 
-function sortByTijdstip(items: MedicatieItem[]): MedicatieItem[] {
+interface MedicatieGroep {
+  naam: string
+  werkzame_stof: string | null
+  indicatie: string | null
+  voorschrijver: string | null
+  startdatum: string | null
+  tijdstippen: { tijdstip: string | null; dosering: string | null }[]
+}
+
+function sorteerTijdstippen(
+  items: { tijdstip: string | null; dosering: string | null }[]
+): { tijdstip: string | null; dosering: string | null }[] {
   return [...items].sort((a, b) => {
-    const ai = TIJDSTIP_ORDER.indexOf(a.tijdstip ?? 'Anders')
-    const bi = TIJDSTIP_ORDER.indexOf(b.tijdstip ?? 'Anders')
-    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+    const ta = a.tijdstip ?? ''
+    const tb = b.tijdstip ?? ''
+    const re = /^(\d{1,2}):(\d{2})$/
+    const ma = ta.match(re)
+    const mb = tb.match(re)
+    if (ma && mb)
+      return (parseInt(ma[1]) * 60 + parseInt(ma[2])) -
+             (parseInt(mb[1]) * 60 + parseInt(mb[2]))
+    if (ma) return -1
+    if (mb) return 1
+    const ai = TIJDSTIP_ORDER.indexOf(ta)
+    const bi = TIJDSTIP_ORDER.indexOf(tb)
+    if (ai === -1 && bi === -1) return ta.localeCompare(tb, 'nl')
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
   })
+}
+
+function groepeerActueelMedicatie(items: MedicatieItem[]): MedicatieGroep[] {
+  const map = new Map<string, MedicatieGroep>()
+
+  for (const item of items) {
+    const key = item.naam.toLowerCase().trim()
+    if (!map.has(key)) {
+      map.set(key, {
+        naam: item.naam.trim(),
+        werkzame_stof: item.werkzame_stof ?? null,
+        indicatie: item.indicatie ?? null,
+        voorschrijver: item.voorschrijver ?? null,
+        startdatum: item.startdatum ?? null,
+        tijdstippen: [],
+      })
+    }
+    const groep = map.get(key)!
+    // Vroegste startdatum bijhouden
+    if (item.startdatum && (!groep.startdatum || item.startdatum < groep.startdatum)) {
+      groep.startdatum = item.startdatum
+    }
+    // Dedup: zelfde tijdstip + dosering niet twee keer opnemen
+    const dk = `${(item.tijdstip ?? '').toLowerCase().trim()}|${(item.dosering ?? '').toLowerCase().trim()}`
+    const bestaat = groep.tijdstippen.some(
+      t => `${(t.tijdstip ?? '').toLowerCase().trim()}|${(t.dosering ?? '').toLowerCase().trim()}` === dk
+    )
+    if (!bestaat) {
+      groep.tijdstippen.push({ tijdstip: item.tijdstip ?? null, dosering: item.dosering ?? null })
+    }
+  }
+
+  return Array.from(map.values()).map(g => ({
+    ...g,
+    tijdstippen: sorteerTijdstippen(g.tijdstippen),
+  }))
 }
 
 function formatDateNL(dateStr: string | null): string {
@@ -137,12 +203,65 @@ const styles = StyleSheet.create({
     fontSize: 8.5,
     color: '#1F2937',
   },
-  // Column widths — actueel
-  colNaam: { flex: 2.2 },
-  colDosering: { flex: 1.8 },
-  colTijdstip: { flex: 1.2 },
-  colStartdatum: { flex: 1.4 },
-  colVoorschrijver: { flex: 1.4 },
+  // Medicatie blok layout
+  medBlok: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  medBlokHeader: {
+    backgroundColor: '#4A7C59',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  medBlokNaam: {
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+    color: 'white',
+  },
+  medBlokWerkzameStof: {
+    fontSize: 8,
+    color: '#C6E0CE',
+    marginTop: 1,
+  },
+  medBlokVoorschrijver: {
+    fontSize: 8,
+    color: '#C6E0CE',
+  },
+  medBlokIndicatie: {
+    backgroundColor: '#EBF5EE',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  medBlokIndicatieTekst: {
+    fontSize: 8,
+    color: '#4A7C59',
+  },
+  medBlokRij: {
+    flexDirection: 'row',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  medBlokRijAlt: {
+    backgroundColor: '#F3F4F6',
+  },
+  medBlokTijdstip: {
+    fontSize: 9,
+    color: '#1F2937',
+    width: 110,
+  },
+  medBlokDosering: {
+    fontSize: 9,
+    color: '#6B7280',
+    flex: 1,
+  },
   // Column widths — historie
   colNaamH: { flex: 2 },
   colDoseringH: { flex: 1.6 },
@@ -205,7 +324,7 @@ export function MedicatieDossierPDF({
   noahGeboortedatum,
   exportDatum,
 }: Props) {
-  const actueelItems = sortByTijdstip(medicaties.filter((m) => m.actief))
+  const actueelGroepen = groepeerActueelMedicatie(medicaties.filter((m) => m.actief))
   const historieItems = [...medicaties.filter((m) => !m.actief)].sort(
     (a, b) => (b.startdatum ?? '').localeCompare(a.startdatum ?? '')
   )
@@ -248,50 +367,52 @@ export function MedicatieDossierPDF({
         {/* Actuele medicatie */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Actuele medicatie</Text>
-          <View style={styles.table}>
-            {/* Table header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderCell, styles.colNaam]}>Naam</Text>
-              <Text style={[styles.tableHeaderCell, styles.colDosering]}>Dosering</Text>
-              <Text style={[styles.tableHeaderCell, styles.colTijdstip]}>Tijdstip</Text>
-              <Text style={[styles.tableHeaderCell, styles.colStartdatum]}>Startdatum</Text>
-              <Text style={[styles.tableHeaderCell, styles.colVoorschrijver]}>Voorschrijver</Text>
+          {actueelGroepen.length === 0 ? (
+            <View style={styles.emptyRow}>
+              <Text style={styles.emptyText}>Geen actuele medicatie</Text>
             </View>
-            {actueelItems.length === 0 ? (
-              <View style={styles.emptyRow}>
-                <Text style={styles.emptyText}>Geen actuele medicatie</Text>
-              </View>
-            ) : (
-              actueelItems.map((item, i) => (
-                <View
-                  key={item.id}
-                  style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlt : {}]}
-                >
-                  <View style={styles.colNaam}>
-                    <Text style={styles.tableCell}>{item.naam}</Text>
-                    {item.werkzame_stof && (
-                      <Text style={[styles.tableCell, { color: GRAY, fontSize: 7.5 }]}>
-                        {item.werkzame_stof}
-                      </Text>
-                    )}
-                    {item.indicatie && (
-                      <Text style={[styles.tableCell, { color: GRAY, fontSize: 7, fontStyle: 'italic' }]}>
-                        {item.indicatie}
-                      </Text>
+          ) : (
+            actueelGroepen.map((g, i) => (
+              <View key={i} style={styles.medBlok}>
+                {/* Naam + werkzame stof links, voorschrijver rechts */}
+                <View style={styles.medBlokHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.medBlokNaam}>{g.naam}</Text>
+                    {g.werkzame_stof && (
+                      <Text style={styles.medBlokWerkzameStof}>{g.werkzame_stof}</Text>
                     )}
                   </View>
-                  <Text style={[styles.tableCell, styles.colDosering]}>{item.dosering ?? '—'}</Text>
-                  <Text style={[styles.tableCell, styles.colTijdstip]}>{item.tijdstip ?? '—'}</Text>
-                  <Text style={[styles.tableCell, styles.colStartdatum]}>
-                    {formatDateNL(item.startdatum)}
-                  </Text>
-                  <Text style={[styles.tableCell, styles.colVoorschrijver]}>
-                    {item.voorschrijver ?? '—'}
-                  </Text>
+                  {g.voorschrijver && (
+                    <Text style={styles.medBlokVoorschrijver}>{g.voorschrijver}</Text>
+                  )}
                 </View>
-              ))
-            )}
-          </View>
+
+                {/* Indicatie strip */}
+                {g.indicatie && (
+                  <View style={styles.medBlokIndicatie}>
+                    <Text style={styles.medBlokIndicatieTekst}>
+                      <Text style={{ fontFamily: 'Helvetica-Bold' }}>Indicatie: </Text>
+                      {g.indicatie}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Doseringsrijen in chronologische volgorde */}
+                {g.tijdstippen.length === 0 ? (
+                  <View style={[styles.medBlokRij]}>
+                    <Text style={[styles.medBlokDosering, { fontStyle: 'italic' }]}>Geen doseringsgegevens</Text>
+                  </View>
+                ) : (
+                  g.tijdstippen.map((t, j) => (
+                    <View key={j} style={[styles.medBlokRij, j % 2 === 1 ? styles.medBlokRijAlt : {}]}>
+                      <Text style={styles.medBlokTijdstip}>{t.tijdstip ?? '—'}</Text>
+                      <Text style={styles.medBlokDosering}>{t.dosering ?? '—'}</Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            ))
+          )}
         </View>
 
         {/* Medicatiehistorie */}

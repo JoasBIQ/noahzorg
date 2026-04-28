@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
+import { ContactPicker } from '@/components/ui/contact-picker'
 import type { Profile } from '@/types'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -673,11 +674,16 @@ export function ZorgplanContent({ currentUserId }: ZorgplanContentProps) {
             onChange={(e) => setDagbestedingForm((f) => ({ ...f, adres: e.target.value }))}
             placeholder="Straat en huisnummer, postcode"
           />
-          <Input
+          <ContactPicker
             label="Contactpersoon"
             value={dagbestedingForm.contactpersoon}
-            onChange={(e) =>
-              setDagbestedingForm((f) => ({ ...f, contactpersoon: e.target.value }))
+            onChange={(v) => setDagbestedingForm((f) => ({ ...f, contactpersoon: v }))}
+            onContactSelect={(c) =>
+              setDagbestedingForm((f) => ({
+                ...f,
+                contactpersoon: c.naam,
+                telefoon: f.telefoon || c.telefoon || '',
+              }))
             }
             placeholder="Naam van de contactpersoon"
           />

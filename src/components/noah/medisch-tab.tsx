@@ -23,6 +23,8 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
+import { ContactPicker, invalidateContactCache } from '@/components/ui/contact-picker'
+import type { PickedContact } from '@/components/ui/contact-picker'
 import { MedicatieDossier } from '@/components/medicaties/medicatie-dossier'
 import { DriveFilePicker } from '@/components/overleggen/drive-file-picker'
 import { DiagnosesSectie } from '@/components/noah/diagnoses-sectie'
@@ -287,7 +289,7 @@ export function MedischTab({ currentUserId }: MedischTabProps) {
     setIsSaving(true)
     try {
       const payload = {
-        naam: behandelaarForm.naam,
+        naam: behandelaarForm.naam.trim(),
         specialisme: behandelaarForm.specialisme || null,
         ziekenhuis: behandelaarForm.ziekenhuis || null,
         telefoon: behandelaarForm.telefoon || null,
@@ -308,12 +310,56 @@ export function MedischTab({ currentUserId }: MedischTabProps) {
         if (error) throw error
       }
 
+      // Behandelaar automatisch ook synchroniseren naar contacten
+      await syncBehandelaarNaarContacten(payload)
+
       await fetchBehandelaars()
       closeBehandelaarModal()
     } catch (err) {
       console.error('Fout bij opslaan behandelaar:', err)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const syncBehandelaarNaarContacten = async (payload: {
+    naam: string
+    specialisme: string | null
+    ziekenhuis: string | null
+    telefoon: string | null
+  }) => {
+    try {
+      // Zoek bestaand contact op naam (case-insensitive)
+      const { data: existing } = await supabase
+        .from('contacten')
+        .select('id')
+        .ilike('naam', payload.naam)
+        .limit(1)
+        .maybeSingle()
+
+      const contactPayload = {
+        naam: payload.naam,
+        functie: payload.specialisme,
+        organisatie: payload.ziekenhuis,
+        telefoon: payload.telefoon,
+        categorie: 'zorg',
+      }
+
+      if (existing) {
+        await supabase
+          .from('contacten')
+          .update(contactPayload as never)
+          .eq('id', existing.id)
+      } else {
+        await supabase
+          .from('contacten')
+          .insert({ ...contactPayload, aangemaakt_door: currentUserId } as never)
+      }
+      // Cache invalideren zodat andere pickers de nieuwe data zien
+      invalidateContactCache()
+    } catch (err) {
+      // Sync-fouten zijn niet fataal — behandelaar is al opgeslagen
+      console.warn('Behandelaar sync naar contacten mislukt:', err)
     }
   }
 
@@ -385,10 +431,19 @@ export function MedischTab({ currentUserId }: MedischTabProps) {
           </div>
           {editHuisarts ? (
             <div className="space-y-3">
-              <Input
+              <ContactPicker
                 label="Naam huisarts"
                 value={draftProfiel.huisarts_naam ?? ''}
-                onChange={(e) => updateDraft('huisarts_naam', e.target.value)}
+                onChange={(v) => updateDraft('huisarts_naam', v)}
+                onContactSelect={(c: PickedContact) =>
+                  setDraftProfiel((prev) => ({
+                    ...prev,
+                    huisarts_naam: c.naam,
+                    huisarts_praktijk: prev.huisarts_praktijk || c.organisatie || null,
+                    huisarts_telefoon: prev.huisarts_telefoon || c.telefoon || null,
+                  }))
+                }
+                placeholder="Naam huisarts"
               />
               <Input
                 label="Praktijk"
@@ -798,11 +853,18 @@ export function MedischTab({ currentUserId }: MedischTabProps) {
         title={editingBehandelaar ? 'Behandelaar bewerken' : 'Behandelaar toevoegen'}
       >
         <div className="space-y-4">
-          <Input
+          <ContactPicker
             label="Naam"
             value={behandelaarForm.naam}
-            onChange={(e) =>
-              setBehandelaarForm((prev) => ({ ...prev, naam: e.target.value }))
+            onChange={(v) => setBehandelaarForm((prev) => ({ ...prev, naam: v }))}
+            onContactSelect={(c: PickedContact) =>
+              setBehandelaarForm((prev) => ({
+                ...prev,
+                naam: c.naam,
+                telefoon: prev.telefoon || c.telefoon || '',
+                specialisme: prev.specialisme || c.functie || '',
+                ziekenhuis: prev.ziekenhuis || c.organisatie || '',
+              }))
             }
             placeholder="Naam behandelaar"
           />

@@ -4,26 +4,30 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'
 
-// PUT — wijs een Trello-kaart toe aan een app-gebruiker (of verwijder toewijzing)
+// PUT — wijs een Trello-kaart toe aan meerdere app-gebruikers (of verwijder toewijzing)
+// Body: { cardId: string, toegewezenAanIds: string[] }
 export async function PUT(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Niet ingelogd.' }, { status: 401 })
 
-    const { cardId, toegewezenAan } = await request.json()
+    const { cardId, toegewezenAanIds } = await request.json()
     if (!cardId) return NextResponse.json({ error: 'cardId is verplicht.' }, { status: 400 })
+
+    const ids: string[] = Array.isArray(toegewezenAanIds) ? toegewezenAanIds : []
 
     const adminClient = createAdminClient()
 
-    // Upsert: zorg dat er een rij bestaat, en stel toegewezen_aan in
+    // Upsert: sla de array op + update backwards-compat enkelvoudige kolom
     const { error } = await adminClient
       .from('trello_kaarten')
       .upsert(
         {
           trello_card_id: cardId,
-          aangemaakt_door: user.id,   // wordt genegeerd als rij al bestaat (zie onConflict)
-          toegewezen_aan: toegewezenAan ?? null,
+          aangemaakt_door: user.id,
+          toegewezen_aan_ids: ids,
+          toegewezen_aan: ids.length > 0 ? ids[0] : null,
         },
         {
           onConflict: 'trello_card_id',

@@ -19,7 +19,7 @@ const SECTIES: { key: keyof ExportSecties; label: string; omschrijving: string }
   {
     key: 'medisch',
     label: 'Medisch',
-    omschrijving: 'Huisarts, diagnose en zorgkantoor',
+    omschrijving: 'Huisarts en zorgkantoor',
   },
   {
     key: 'diagnoses',

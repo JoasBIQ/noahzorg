@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { getTrelloCredentials } from '@/lib/trello-credentials'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,19 +59,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'cardId is verplicht.' }, { status: 400 })
     }
 
-    const { data: allSettings } = await supabase
-      .from('app_instellingen')
-      .select('key, value')
-      .in('key', ['trello_api_key', 'trello_api_token', 'trello_board_id'])
-
-    const settings: Record<string, string> = {}
-    for (const s of allSettings || []) {
-      settings[s.key] = s.value
-    }
-
-    const apiKey = settings['trello_api_key']
-    const apiToken = settings['trello_api_token']
-    const boardId = settings['trello_board_id']
+    const { apiKey, apiToken, boardId } = await getTrelloCredentials()
 
     if (!apiKey || !apiToken || !boardId) {
       return NextResponse.json({ error: 'Trello niet geconfigureerd.' }, { status: 400 })

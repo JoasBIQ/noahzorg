@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
+import { ContactPicker } from '@/components/ui/contact-picker'
 
 interface Diagnose {
   id: string
@@ -284,10 +285,11 @@ export function DiagnosesSectie({ currentUserId }: DiagnosesSectieProps) {
               onChange={(e) => setForm((prev) => ({ ...prev, datum_gesteld: e.target.value }))}
               type="date"
             />
-            <Input
+            <ContactPicker
               label="Gesteld door"
               value={form.gesteld_door}
-              onChange={(e) => setForm((prev) => ({ ...prev, gesteld_door: e.target.value }))}
+              onChange={(v) => setForm((prev) => ({ ...prev, gesteld_door: v }))}
+              onContactSelect={(c) => setForm((prev) => ({ ...prev, gesteld_door: c.naam }))}
               placeholder="Naam arts of instelling"
             />
           </div>

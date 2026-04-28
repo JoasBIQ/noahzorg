@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getTrelloCredentials } from '@/lib/trello-credentials'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,12 @@ interface TrelloMember {
   id: string
   fullName: string
   avatarUrl: string | null
+}
+
+interface AppProfile {
+  id: string
+  naam: string
+  kleur: string
 }
 
 interface TrelloCard {
@@ -31,6 +38,7 @@ interface TrelloCard {
   toegewezen_aan_id?: string | null
   toegewezen_aan_naam?: string | null
   toegewezen_aan_kleur?: string | null
+  toegewezen_profielen?: AppProfile[]
 }
 
 interface TrelloList {
@@ -65,40 +73,18 @@ export async function GET() {
       return NextResponse.json({ error: 'Niet ingelogd.' }, { status: 401 })
     }
 
-    // Fetch Trello settings from app_instellingen
-    const { data: allSettings } = await supabase
-      .from('app_instellingen')
-      .select('key, value')
-      .in('key', ['trello_api_key', 'trello_api_token', 'trello_board_id'])
+    const { apiKey, apiToken, boardId } = await getTrelloCredentials()
 
-    if (!allSettings || allSettings.length === 0) {
+    if (!apiKey || !apiToken || !boardId) {
       return NextResponse.json({ lists: [], boardUrl: '', configured: false })
     }
 
-    const settingsMap: Record<string, string> = {}
-    for (const s of allSettings) {
-      settingsMap[s.key] = s.value
-    }
-
-    const apiKey = settingsMap['trello_api_key']
-    const apiToken = settingsMap['trello_api_token']
-    const boardId = settingsMap['trello_board_id']
-
-    if (!apiKey || !apiToken || !boardId) {
-      console.log('[Trello] Missing credentials:', { hasKey: !!apiKey, hasToken: !!apiToken, hasBoardId: !!boardId })
-      return NextResponse.json({ lists: [], boardUrl: '', configured: false, debug: `Missing: key=${!!apiKey} token=${!!apiToken} board=${!!boardId}` })
-    }
-
-    console.log('[Trello] Fetching board:', boardId)
-    console.log('[Trello] API Key (first 8):', apiKey.slice(0, 8) + '...')
-    console.log('[Trello] Token (first 8):', apiToken.slice(0, 8) + '...')
-
     const boardUrl = `https://trello.com/b/${boardId}`
 
-    // Skip cache for debugging
-    // if (cache && Date.now() - cache.fetchedAt < CACHE_TTL) {
-    //   return NextResponse.json({ lists: cache.lists, boardUrl: cache.boardUrl, configured: true })
-    // }
+    // Stuur cache terug als die nog vers is
+    if (cache && Date.now() - cache.fetchedAt < CACHE_TTL) {
+      return NextResponse.json({ lists: cache.lists, boardUrl: cache.boardUrl, configured: true })
+    }
 
     const auth = `key=${apiKey}&token=${apiToken}`
 
@@ -114,26 +100,18 @@ export async function GET() {
       fetch(membersUrl),
     ])
 
-    console.log('[Trello] Lists status:', listsRes.status)
-    console.log('[Trello] Cards status:', cardsRes.status)
-    console.log('[Trello] Members status:', membersRes.status)
-
     if (!listsRes.ok) {
       const errText = await listsRes.text()
-      console.error('[Trello] Lists error body:', errText)
       return NextResponse.json({ lists: [], boardUrl, configured: true, error: `Lists fout (${listsRes.status}): ${errText}` })
     }
 
     if (!cardsRes.ok) {
       const errText = await cardsRes.text()
-      console.error('[Trello] Cards error body:', errText)
       return NextResponse.json({ lists: [], boardUrl, configured: true, error: `Cards fout (${cardsRes.status}): ${errText}` })
     }
 
     const rawLists: TrelloRawList[] = await listsRes.json()
     const rawCards: TrelloCard[] = await cardsRes.json()
-    console.log('[Trello] Found lists:', rawLists.length, rawLists.map(l => l.name))
-    console.log('[Trello] Found cards:', rawCards.length)
 
     // Build members map
     const membersMap: Record<string, TrelloMember> = {}
@@ -159,13 +137,27 @@ export async function GET() {
     // Haal maker- en toewijzingsinfo op uit Supabase voor alle kaarten
     const allCardIds = rawCards.map((c) => c.id)
     const makerMap: Record<string, { naam: string; kleur: string }> = {}
-    const toegewezenMap: Record<string, { id: string; naam: string; kleur: string }> = {}
+    // cardId → geresolveerde AppProfiles (multi-toewijzing)
+    const toegewezenProfielenMap: Record<string, AppProfile[]> = {}
+
     if (allCardIds.length > 0) {
       const adminClient = createAdminClient()
+
+      // Haal alle actieve profielen eenmalig op voor naam/kleur lookup
+      const { data: alleProfielen } = await adminClient
+        .from('profiles')
+        .select('id, naam, kleur')
+        .eq('actief', true)
+      const profielenMap: Record<string, AppProfile> = {}
+      for (const p of (alleProfielen ?? []) as AppProfile[]) {
+        profielenMap[p.id] = p
+      }
+
       const { data: kaarten } = await adminClient
         .from('trello_kaarten')
         .select(`
           trello_card_id,
+          toegewezen_aan_ids,
           maker:aangemaakt_door ( naam, kleur ),
           toegewezen:toegewezen_aan ( id, naam, kleur )
         `)
@@ -175,12 +167,17 @@ export async function GET() {
         const maker = k.maker as unknown as { naam: string; kleur: string } | null
         if (maker) makerMap[k.trello_card_id] = { naam: maker.naam, kleur: maker.kleur }
 
-        const toegewezen = k.toegewezen as unknown as { id: string; naam: string; kleur: string } | null
-        if (toegewezen) {
-          toegewezenMap[k.trello_card_id] = {
-            id: toegewezen.id,
-            naam: toegewezen.naam,
-            kleur: toegewezen.kleur,
+        // Multi-toewijzing heeft prioriteit
+        const ids = (k.toegewezen_aan_ids ?? []) as string[]
+        if (ids.length > 0) {
+          toegewezenProfielenMap[k.trello_card_id] = ids
+            .map((id) => profielenMap[id])
+            .filter(Boolean)
+        } else {
+          // Fallback naar oude enkelvoudige kolom
+          const toegewezen = k.toegewezen as unknown as AppProfile | null
+          if (toegewezen) {
+            toegewezenProfielenMap[k.trello_card_id] = [toegewezen]
           }
         }
       }
@@ -192,11 +189,14 @@ export async function GET() {
         card.aangemaakt_door_naam = makerMap[card.id].naam
         card.aangemaakt_door_kleur = makerMap[card.id].kleur
       }
-      if (toegewezenMap[card.id]) {
-        card.toegewezen_aan_id = toegewezenMap[card.id].id
-        card.toegewezen_aan_naam = toegewezenMap[card.id].naam
-        card.toegewezen_aan_kleur = toegewezenMap[card.id].kleur
+      const profielen = toegewezenProfielenMap[card.id] ?? []
+      if (profielen.length > 0) {
+        // Backwards-compat: eerste toegewezene ook als enkele velden
+        card.toegewezen_aan_id = profielen[0].id
+        card.toegewezen_aan_naam = profielen[0].naam
+        card.toegewezen_aan_kleur = profielen[0].kleur
       }
+      card.toegewezen_profielen = profielen
     }
 
     // Combine into final structure — filter out "Archief" list (case-insensitive)
@@ -216,4 +216,10 @@ export async function GET() {
     console.error('Trello board error:', error)
     return NextResponse.json({ lists: [], boardUrl: '', configured: false })
   }
+}
+
+// POST — invalideert de cache zodat de volgende GET vers data ophaalt
+export async function POST() {
+  cache = null
+  return NextResponse.json({ success: true })
 }

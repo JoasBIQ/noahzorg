@@ -343,26 +343,73 @@ function PageFooter({ exportDatum }: { exportDatum: string }) {
 
 // ── Medicatie groepering ──────────────────────────────────────────────────────
 
-const TIJDSTIP_VOLGORDE = ['Ochtend', 'Lunch', 'Uur voor bedtijd', 'Bedtijd', 'Zo nodig', 'Dagelijks', 'Anders']
+/** Volgorde van bekende tijdstipnamen (ochtend → nacht → zo nodig) */
+const TIJDSTIP_VOLGORDE = [
+  'Ochtend', 'Ontbijt',
+  'Middag', 'Lunch',
+  'Namiddag', 'Avond', 'Avondeten',
+  'Uur voor bedtijd', 'Bedtijd', 'Nacht',
+  'Zo nodig', 'Dagelijks', 'Anders',
+]
+
+function sorteerTijdstippen(
+  items: { tijdstip: string | null; dosering: string | null }[]
+) {
+  return [...items].sort((a, b) => {
+    const ta = a.tijdstip ?? ''
+    const tb = b.tijdstip ?? ''
+    // Klok-tijden (bijv. "08:00") komen voor benoemde tijden
+    const re = /^(\d{1,2}):(\d{2})$/
+    const ma = ta.match(re)
+    const mb = tb.match(re)
+    if (ma && mb)
+      return (parseInt(ma[1]) * 60 + parseInt(ma[2])) -
+             (parseInt(mb[1]) * 60 + parseInt(mb[2]))
+    if (ma) return -1
+    if (mb) return 1
+    const ai = TIJDSTIP_VOLGORDE.indexOf(ta)
+    const bi = TIJDSTIP_VOLGORDE.indexOf(tb)
+    if (ai === -1 && bi === -1) return ta.localeCompare(tb, 'nl')
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
+}
 
 function groepeerMedicatie(items: MedicatieDossierExportData[]) {
   const map = new Map<string, {
-    naam: string; werkzame_stof: string | null; indicatie: string | null
+    naam: string
+    werkzame_stof: string | null
+    indicatie: string | null
     tijdstippen: { tijdstip: string | null; dosering: string | null }[]
     voorschrijver: string | null
   }>()
+
   for (const item of items) {
     const key = item.naam.toLowerCase().trim()
-    if (!map.has(key)) map.set(key, { naam: item.naam, werkzame_stof: item.werkzame_stof ?? null, indicatie: item.indicatie ?? null, tijdstippen: [], voorschrijver: item.voorschrijver ?? null })
-    map.get(key)!.tijdstippen.push({ tijdstip: item.tijdstip ?? null, dosering: item.dosering ?? null })
+    if (!map.has(key)) {
+      map.set(key, {
+        naam: item.naam.trim(),
+        werkzame_stof: item.werkzame_stof ?? null,
+        indicatie: item.indicatie ?? null,
+        tijdstippen: [],
+        voorschrijver: item.voorschrijver ?? null,
+      })
+    }
+    const groep = map.get(key)!
+    // Dedup: zelfde tijdstip + dosering niet twee keer opnemen
+    const dk = `${(item.tijdstip ?? '').toLowerCase().trim()}|${(item.dosering ?? '').toLowerCase().trim()}`
+    const bestaat = groep.tijdstippen.some(
+      t => `${(t.tijdstip ?? '').toLowerCase().trim()}|${(t.dosering ?? '').toLowerCase().trim()}` === dk
+    )
+    if (!bestaat) {
+      groep.tijdstippen.push({ tijdstip: item.tijdstip ?? null, dosering: item.dosering ?? null })
+    }
   }
+
   return Array.from(map.values()).map(g => ({
     ...g,
-    tijdstippen: g.tijdstippen.sort((a, b) => {
-      const ai = TIJDSTIP_VOLGORDE.indexOf(a.tijdstip ?? 'Anders')
-      const bi = TIJDSTIP_VOLGORDE.indexOf(b.tijdstip ?? 'Anders')
-      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
-    })
+    tijdstippen: sorteerTijdstippen(g.tijdstippen),
   }))
 }
 
@@ -576,26 +623,66 @@ export function NoahDossierPDF({ data }: { data: NoahDossierData }) {
           <View style={styles.sectieContainer}>
             <Text style={styles.sectieKop}>Actuele medicatie</Text>
             {groepen.length > 0 ? (
-              <View style={styles.tabel}>
-                <View style={styles.tabelKopRij}>
-                  <Text style={[styles.tabelKopTekst, { flex: 2.2 }]}>Naam (werkzame stof)</Text>
-                  <Text style={[styles.tabelKopTekst, { flex: 1.8 }]}>Indicatie</Text>
-                  <Text style={[styles.tabelKopTekst, { flex: 2 }]}>Tijdstip &amp; dosering</Text>
-                  <Text style={[styles.tabelKopTekst, { flex: 1.5 }]}>Voorschrijver</Text>
-                </View>
+              <View style={{ gap: 8 }}>
                 {groepen.map((g, i) => (
-                  <View key={i} style={[styles.tabelRij, i % 2 === 1 ? styles.tabelRijAlt : {}]}>
-                    <View style={{ flex: 2.2 }}>
-                      <Text style={styles.tabelCel}>{g.naam}</Text>
-                      {g.werkzame_stof && <Text style={[styles.tabelCelGrijs, {fontSize: 7.5}]}>{g.werkzame_stof}</Text>}
+                  <View key={i} style={{ borderWidth: 1, borderColor: RAND, borderRadius: 4, overflow: 'hidden', marginBottom: 6 }}>
+                    {/* Medicatie header: naam + werkzame stof links, voorschrijver rechts */}
+                    <View style={{
+                      backgroundColor: GROEN,
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      paddingHorizontal: 8,
+                      paddingVertical: 5,
+                    }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: WIT }}>{g.naam}</Text>
+                        {g.werkzame_stof && (
+                          <Text style={{ fontSize: 8, color: '#C6E0CE', marginTop: 1 }}>{g.werkzame_stof}</Text>
+                        )}
+                      </View>
+                      {g.voorschrijver && (
+                        <Text style={{ fontSize: 8, color: '#C6E0CE', marginLeft: 8, flexShrink: 0 }}>{g.voorschrijver}</Text>
+                      )}
                     </View>
-                    <Text style={[styles.tabelCelGrijs, { flex: 1.8 }]}>{g.indicatie ?? '—'}</Text>
-                    <View style={{ flex: 2 }}>
-                      {g.tijdstippen.map((t, j) => (
-                        <Text key={j} style={styles.tabelCelGrijs}>{[t.tijdstip, t.dosering].filter(Boolean).join(': ')}</Text>
-                      ))}
-                    </View>
-                    <Text style={[styles.tabelCelGrijs, { flex: 1.5 }]}>{g.voorschrijver ?? '—'}</Text>
+
+                    {/* Indicatie strip */}
+                    {g.indicatie && (
+                      <View style={{ backgroundColor: GROEN_LICHT, paddingHorizontal: 8, paddingVertical: 3 }}>
+                        <Text style={{ fontSize: 8, color: GROEN }}>
+                          <Text style={{ fontFamily: 'Helvetica-Bold' }}>Indicatie: </Text>
+                          {g.indicatie}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Doseringsrijen */}
+                    {g.tijdstippen.map((t, j) => (
+                      <View
+                        key={j}
+                        style={{
+                          flexDirection: 'row',
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          backgroundColor: j % 2 === 1 ? GRIJS_LICHT : WIT,
+                          borderTopWidth: 1,
+                          borderTopColor: RAND,
+                        }}
+                      >
+                        <Text style={{ fontSize: 9, color: TEKST, width: 110, flexShrink: 0 }}>
+                          {t.tijdstip ?? '—'}
+                        </Text>
+                        <Text style={{ fontSize: 9, color: GRIJS, flex: 1 }}>
+                          {t.dosering ?? '—'}
+                        </Text>
+                      </View>
+                    ))}
+
+                    {g.tijdstippen.length === 0 && (
+                      <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderTopWidth: 1, borderTopColor: RAND }}>
+                        <Text style={{ fontSize: 9, color: GRIJS, fontStyle: 'italic' }}>Geen doseringsgegevens</Text>
+                      </View>
+                    )}
                   </View>
                 ))}
               </View>

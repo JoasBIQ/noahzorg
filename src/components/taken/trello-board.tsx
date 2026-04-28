@@ -51,6 +51,7 @@ interface TrelloCard {
   toegewezen_aan_id?: string | null
   toegewezen_aan_naam?: string | null
   toegewezen_aan_kleur?: string | null
+  toegewezen_profielen?: AppProfile[]
 }
 
 interface TrelloList {
@@ -217,17 +218,27 @@ function TrelloCardItem({
               )}
             </div>
 
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {card.toegewezen_aan_naam && (
-                <span
-                  className="flex items-center justify-center w-6 h-6 rounded-full text-white text-[10px] font-bold flex-shrink-0"
-                  style={{ backgroundColor: card.toegewezen_aan_kleur ?? '#6B7280' }}
-                  title={`Toegewezen aan ${card.toegewezen_aan_naam}`}
-                >
-                  {card.toegewezen_aan_naam.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
-                </span>
-              )}
-              {card.aangemaakt_door_naam && !card.toegewezen_aan_naam && (
+            <div className="flex items-center flex-shrink-0">
+              {(card.toegewezen_profielen ?? []).length > 0 ? (
+                // Multi-toewijzing: overlappende avatars (max 3 + overflow badge)
+                <div className="flex -space-x-1.5">
+                  {(card.toegewezen_profielen ?? []).slice(0, 3).map((p) => (
+                    <span
+                      key={p.id}
+                      className="flex items-center justify-center w-6 h-6 rounded-full text-white text-[10px] font-bold ring-2 ring-white flex-shrink-0"
+                      style={{ backgroundColor: p.kleur ?? '#6B7280' }}
+                      title={p.naam}
+                    >
+                      {getInitials(p.naam).slice(0, 2)}
+                    </span>
+                  ))}
+                  {(card.toegewezen_profielen ?? []).length > 3 && (
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-400 text-white text-[9px] font-bold ring-2 ring-white">
+                      +{(card.toegewezen_profielen ?? []).length - 3}
+                    </span>
+                  )}
+                </div>
+              ) : card.aangemaakt_door_naam ? (
                 <span
                   className="flex-shrink-0 text-xs font-medium px-1.5 py-0.5 rounded-full text-white opacity-60"
                   style={{ backgroundColor: card.aangemaakt_door_kleur ?? '#4A7C59' }}
@@ -235,7 +246,7 @@ function TrelloCardItem({
                 >
                   {card.aangemaakt_door_naam.split(' ')[0]}
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -426,8 +437,8 @@ function CardDetailModal({
   const [editNaam, setEditNaam] = useState('')
   const [editOmschrijving, setEditOmschrijving] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
-  // Toewijzing
-  const [toewijzing, setToewijzing] = useState<string>('')
+  // Toewijzing (meerdere personen mogelijk)
+  const [toewijzingIds, setToewijzingIds] = useState<string[]>([])
   const [savingToewijzing, setSavingToewijzing] = useState(false)
 
   useEffect(() => {
@@ -435,7 +446,7 @@ function CardDetailModal({
     setEditMode(false)
     setEditNaam(card?.name ?? '')
     setEditOmschrijving(card?.desc ?? '')
-    setToewijzing(card?.toegewezen_aan_id ?? '')
+    setToewijzingIds(card?.toegewezen_profielen?.map((p) => p.id) ?? (card?.toegewezen_aan_id ? [card.toegewezen_aan_id] : []))
     // Zet due date input: datetime-local verwacht "YYYY-MM-DDTHH:mm"
     if (card?.due) {
       const d = new Date(card.due)
@@ -521,27 +532,44 @@ function CardDetailModal({
     }
   }
 
-  const handleToewijzingChange = async (profielId: string) => {
+  const saveToewijzing = async (newIds: string[]) => {
     if (!card || savingToewijzing) return
-    setToewijzing(profielId)
+    setToewijzingIds(newIds)
     setSavingToewijzing(true)
     try {
       await fetch('/api/trello/toewijzing', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: card.id, toegewezenAan: profielId || null }),
+        body: JSON.stringify({ cardId: card.id, toegewezenAanIds: newIds }),
       })
-      const profiel = allProfiles?.find((p) => p.id === profielId) ?? null
+      const profielen = (allProfiles ?? []).filter((p) => newIds.includes(p.id))
       onCardUpdated?.(card.id, {
-        toegewezen_aan_id: profiel?.id ?? null,
-        toegewezen_aan_naam: profiel?.naam ?? null,
-        toegewezen_aan_kleur: profiel?.kleur ?? null,
+        toegewezen_aan_id: profielen[0]?.id ?? null,
+        toegewezen_aan_naam: profielen[0]?.naam ?? null,
+        toegewezen_aan_kleur: profielen[0]?.kleur ?? null,
+        toegewezen_profielen: profielen,
       })
     } catch (err) {
       console.error('Toewijzing opslaan mislukt:', err)
     } finally {
       setSavingToewijzing(false)
     }
+  }
+
+  const handleToggleToewijzing = (profielId: string) => {
+    const newIds = toewijzingIds.includes(profielId)
+      ? toewijzingIds.filter((id) => id !== profielId)
+      : [...toewijzingIds, profielId]
+    saveToewijzing(newIds)
+  }
+
+  const handleToewijzingIedereen = () => {
+    const alleIds = (allProfiles ?? []).map((p) => p.id)
+    saveToewijzing(alleIds)
+  }
+
+  const handleToewijzingNiemand = () => {
+    saveToewijzing([])
   }
 
   const handleSaveEdit = async () => {
@@ -764,44 +792,63 @@ function CardDetailModal({
           </div>
         )}
 
-        {/* Toewijzen aan persoon */}
+        {/* Toewijzen aan persoon / personen */}
         {allProfiles && allProfiles.length > 0 && (
           <div>
             <h3 className="text-sm font-semibold text-gray-700 mb-2">Toegewezen aan</h3>
             <div className="flex flex-wrap gap-2">
-              {/* Optie: niemand */}
+              {/* Niemand */}
               <button
-                onClick={() => handleToewijzingChange('')}
+                onClick={handleToewijzingNiemand}
                 disabled={savingToewijzing}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors disabled:opacity-50 ${
-                  !toewijzing
+                  toewijzingIds.length === 0
                     ? 'bg-gray-200 border-gray-300 text-gray-700'
                     : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
                 }`}
               >
                 Niemand
               </button>
-              {allProfiles.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => handleToewijzingChange(p.id)}
-                  disabled={savingToewijzing}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-colors disabled:opacity-50 ${
-                    toewijzing === p.id
-                      ? 'border-transparent text-white'
-                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                  }`}
-                  style={toewijzing === p.id ? { backgroundColor: p.kleur } : {}}
-                >
-                  <span
-                    className="flex items-center justify-center w-4 h-4 rounded-full text-white text-[9px] font-bold flex-shrink-0"
-                    style={{ backgroundColor: toewijzing === p.id ? 'rgba(255,255,255,0.3)' : p.kleur }}
+              {/* Iedereen */}
+              <button
+                onClick={handleToewijzingIedereen}
+                disabled={savingToewijzing}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors disabled:opacity-50 ${
+                  allProfiles.every((p) => toewijzingIds.includes(p.id))
+                    ? 'bg-[#4A7C59] border-transparent text-white'
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                Iedereen
+              </button>
+              {/* Per persoon togglebaar */}
+              {allProfiles.map((p) => {
+                const selected = toewijzingIds.includes(p.id)
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => handleToggleToewijzing(p.id)}
+                    disabled={savingToewijzing}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-colors disabled:opacity-50 ${
+                      selected
+                        ? 'border-transparent text-white'
+                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                    }`}
+                    style={selected ? { backgroundColor: p.kleur } : {}}
                   >
-                    {p.naam.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
-                  </span>
-                  {p.naam.split(' ')[0]}
-                </button>
-              ))}
+                    <span
+                      className="flex items-center justify-center w-4 h-4 rounded-full text-white text-[9px] font-bold flex-shrink-0"
+                      style={{ backgroundColor: selected ? 'rgba(255,255,255,0.3)' : p.kleur }}
+                    >
+                      {getInitials(p.naam).slice(0, 2)}
+                    </span>
+                    {p.naam.split(' ')[0]}
+                    {selected && (
+                      <span className="ml-0.5 opacity-80">✓</span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
@@ -1061,6 +1108,12 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst, allP
     }
   }, [])
 
+  /** Invalideert de server-side cache en haalt daarna vers board-data op */
+  const invalidateAndFetch = useCallback(async () => {
+    await fetch('/api/trello/board', { method: 'POST' }).catch(() => {})
+    await fetchBoard()
+  }, [fetchBoard])
+
   useEffect(() => {
     const init = async () => {
       await fetchBoard()
@@ -1089,12 +1142,8 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst, allP
   const handleDragEnd = async (result: DropResult) => {
     const { draggableId, source, destination } = result
 
-    console.log('[Trello DnD] drag end:', { draggableId, source, destination })
-
     if (!destination) return
     if (source.droppableId === destination.droppableId && source.index === destination.index) return
-
-    console.log('[Trello DnD] Moving card', draggableId, 'from list', source.droppableId, 'to list', destination.droppableId)
 
     // Optimistic update
     const newLists = lists.map((list) => ({
@@ -1115,7 +1164,6 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst, allP
 
     // Sync with Trello
     try {
-      console.log('[Trello DnD] Sending PATCH:', { cardId: draggableId, idList: destination.droppableId })
       const res = await fetch('/api/trello/card', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -1123,22 +1171,19 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst, allP
       })
 
       const data = await res.json()
-      console.log('[Trello DnD] PATCH response:', res.status, data)
 
       if (!res.ok || !data.success) {
-        console.error('[Trello DnD] Verplaatsen mislukt:', data.error)
         setDebugInfo(`Verplaatsen mislukt: ${data.error || 'Onbekende fout'}`)
-        // Revert: haal originele staat op
-        await fetchBoard()
+        // Revert: invalideer cache en haal verse staat op
+        await invalidateAndFetch()
       } else {
-        console.log('[Trello DnD] Succes! Kaart verplaatst.')
         // Optimistic update is al correct, geen refetch nodig
         setDebugInfo(null)
       }
     } catch (err) {
       console.error('[Trello DnD] Fout:', err)
       setDebugInfo(`Verplaatsen mislukt: ${String(err)}`)
-      await fetchBoard()
+      await invalidateAndFetch()
     }
   }
 
@@ -1170,11 +1215,11 @@ export function TrelloBoard({ currentUserId, isBeheerder, initialTaakTekst, allP
         body: JSON.stringify({ cardId, idList: klaarListId }),
       })
       if (!res.ok) {
-        // Revert bij fout
-        await fetchBoard()
+        // Revert bij fout: invalideer cache en haal verse staat op
+        await invalidateAndFetch()
       }
     } catch {
-      await fetchBoard()
+      await invalidateAndFetch()
     } finally {
       setMarkingKlaarId(null)
     }
